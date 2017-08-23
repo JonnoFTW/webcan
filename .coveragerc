@@ -1,0 +1,3 @@
+[run]
+source = webcan
+omit = webcan/test*
