@@ -7,18 +7,8 @@ with open(os.path.join(here, 'README.txt')) as f:
     README = f.read()
 with open(os.path.join(here, 'CHANGES.txt')) as f:
     CHANGES = f.read()
-
-requires = [
-    'pyramid',
-    'pyramid_mako',
-    'pyramid_debugtoolbar',
-    'waitress',
-    'pymongo',
-    'pyshp',
-    'bcrypt',
-    'ldap',
-    'pluck'
-    ]
+with open(os.path.join(here, 'requirements.txt')) as f:
+    requires = f.readlines()
 
 tests_require = [
     'WebTest >= 1.3.1',  # py3 compat

@@ -1,0 +1,11 @@
+pyramid
+pyramid_mako
+pyramid_debugtoolbar
+waitress
+pymongo
+pyshp
+bcrypt
+ldap
+pluck
+numpy
+scipy

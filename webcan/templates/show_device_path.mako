@@ -79,11 +79,17 @@
 
 
         context.beginPath();
-        context.arc(midx, midy, midx, 0, 2 * Math.PI, false);
+        context.arc(midx, midy, midx-1.5, 0, 2 * Math.PI, false);
         context.fillStyle = "#" + bgCol;
         context.fill();
-        context.lineWidth = 2;
-        context.strokeStyle = "#FFFFFF";
+        context.lineWidth = 3;
+        var engine_load = reading['PID_ENGINE_LOAD (%)'];
+        if (engine_load === undefined) {
+            engine_load = 0;
+        } else {
+            engine_load = parseInt(engine_load/100 * 255);
+        }
+        context.strokeStyle = "#00{}00".format(engine_load.toString(16));
         context.stroke();
 ##         context.endPath();
 

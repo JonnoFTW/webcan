@@ -1,4 +1,5 @@
-import numpy as np
+# import numpy as np
+from collections import deque
 from pyramid.view import view_config
 from .views import get_device_trips_for_user
 import pymongo
@@ -6,10 +7,10 @@ import pymongo
 @view_config(route_name='report_list', renderer="templates/reports/list_reports.mako")
 def report_list(request):
     introspector = request.registry.introspector
-    reports = [
+    reports = set([
         i for i in introspector._categories['routes'].values() if
         i['pattern'].startswith('/report/') and '{' not in i['pattern']
-    ]
+    ])
     return {'reports': reports}
 
 
@@ -27,7 +28,7 @@ def phase_classify_render(request):
     },
         {'_id': False}).sort([('timestamp', pymongo.ASCENDING)]))
     _classify_readings_with_phases(readings)
-    return {'readings': readings[75:150]}
+    return {'readings': readings}
 
 
 def _classify_readings_with_phases(readings):
@@ -44,6 +45,7 @@ def _classify_readings_with_phases(readings):
     speed = 'PID_SPEED (km/h)'
     phase = 'phase'
     # load into numpy
+    last_series = deque(maxlen=5)
     last = None
     from_zero = True
     cruise_thresh = 4
@@ -71,3 +73,4 @@ def _classify_readings_with_phases(readings):
         if phase not in r:
             r[phase] = 6
         last = r
+        last_series.append(r)
