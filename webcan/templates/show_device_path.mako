@@ -102,6 +102,7 @@
     };
     var show_path = function (readings) {
         var last = null;
+        var markers = [];
         _.forEach(readings, function (reading) {
             var tooltip = "<h5>Reading {}</h5>".format(reading.trip_sequence);
             reading.lat = reading.pos.coordinates[1];
@@ -128,16 +129,16 @@
                 }
 
                 tooltip += "<b>{}: </b> {} {}<br>".format(k, v, suffix);
-                map.addMarker({
-                    lat: reading.lat,
-                    lng: reading.lng,
-                    icon: generateIcon(reading),
-                    infoWindow: {
-                        content: tooltip
-                    }
-                });
             });
-
+            markers.push({
+                lat: reading.lat,
+                lng: reading.lng,
+                icon: generateIcon(reading),
+                infoWindow: {
+                    content: tooltip
+                }
+            });
         });
+        map.addMarkers(markers);
     }
 </script>
