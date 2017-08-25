@@ -42,8 +42,7 @@ def main(global_config, **settings):
     config.add_route('trips_of_device', '/dev_trips')
 
     config.add_route('report_list', '/report')
-    config.add_route('report_phase', '/report/phase/')
-    config.add_route('report_phase_classify', '/report/phase/{trip_id}')
+    config.add_route('report_phase', '/report/phase')
 
     def add_db(request):
         conn = MongoClient(db_url.geturl())

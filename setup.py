@@ -10,11 +10,14 @@ with open(os.path.join(here, 'CHANGES.txt')) as f:
 
 requires = [
     'pyramid',
-	'pyramid_mako',
+    'pyramid_mako',
     'pyramid_debugtoolbar',
     'waitress',
     'pymongo',
-    'pyshp'
+    'pyshp',
+    'bcrypt',
+    'ldap',
+    'pluck'
     ]
 
 tests_require = [
