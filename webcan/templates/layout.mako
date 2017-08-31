@@ -32,6 +32,7 @@
     <script type="text/javascript">
         format.extend(String.prototype, {});
     </script>
+    <!-- PID: ${_pid}-->
 </head>
 
 <body>

@@ -1,13 +1,14 @@
-from pyramid.renderers import render_to_response, get_renderer
-from pyramid.view import view_config, notfound_view_config
 from pyramid.events import BeforeRender, subscriber, BeforeTraversal
 from pyramid.security import remember, forget, Authenticated, Allow
+from pyramid.renderers import render_to_response, get_renderer
+from pyramid.view import view_config, notfound_view_config
 from ldap3 import Server, Connection, ALL, NTLM
 import pyramid.httpexceptions as exc
-import secrets
-import bcrypt
 from datetime import datetime
 from pluck import pluck
+import secrets
+import bcrypt
+import os
 
 import pymongo
 
@@ -57,6 +58,7 @@ def check_logged_in(event):
 @subscriber(BeforeRender)
 def add_device_global(event):
     if event['renderer_info'].type == '.mako':
+        event['_pid'] = os.getpid()
         if event['request'].user is not None:
             event['devices'] = event['request'].user['devices']
 
@@ -122,7 +124,8 @@ def trip_csv(request):
 def get_device_trips_for_user(request):
     return list(
         request.db.rpi_readings.distinct('trip_id',
-                                         {'vid': {'$in': pluck(request.user['devices'], 'name')}}))
+                                         {'vid': {'$in': pluck(request.user['devices'], 'name')},
+                                          'timestamp': {'$ne': None}}))
 
 
 @view_config(route_name='data_export', request_method='GET', renderer='templates/data_export.mako')
