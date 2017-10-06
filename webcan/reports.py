@@ -1,7 +1,9 @@
+from datetime import timedelta
+
 from .views import get_device_trips_for_user
 from pyramid.view import view_config
 from geopy.distance import vincenty
-from collections import deque
+from collections import deque, defaultdict
 from pluck import pluck
 import numpy as np
 import pymongo
@@ -31,14 +33,20 @@ def phase_classify(request):
 
 @view_config(route_name='report_phase', request_method='POST', renderer="bson")
 def phase_classify_render(request):
-    readings = list(request.db.rpi_readings.find({
-        'trip_id': {'$in': request.POST.getall('trips[]')},
+    query = {
         'PID_SPEED (km/h)': {'$ne': None},
         'timestamp': {'$exists': True, '$ne': None},
         'pos': {'$ne': None}
-    },
-        {'_id': False}).sort([('timestamp', pymongo.ASCENDING)]))
-    _classify_readings_with_phases_pas(readings)
+    }
+    print(request.POST)
+    min_phase_time = int(request.POST.get('min-phase-seconds'))
+    if request.POST.getall('trips[]'):
+        query['trip_id'] = {'$in': request.POST.getall('trips[]')}
+    if request.POST.getall('devices[]'):
+        query['vid'] = {'$in': request.POST.getall('devices[]')}
+    readings = list(request.db.rpi_readings.find(query,
+                                                 {'_id': False}).sort([('timestamp', pymongo.ASCENDING)]))
+    _classify_readings_with_phases_pas(readings, min_phase_time)
     summary = _summarise_readings(readings)
     return {
         'readings': readings,
@@ -48,77 +56,169 @@ def phase_classify_render(request):
 
 def _summarise_readings(readings):
     """
-    Break down readings into
+    Break down readings into individual trips and provide stats
+
+    Then aggregate and provide stats for each vehicle
     :param readings:
     :param phases:
     :return:
     """
+    trips = defaultdict(list)
+    vehicles = defaultdict(list)
+    vid_trips = {}
+    for r in readings:
+        trips[r['trip_id']].append(r)
+        vehicles[r['vid']].append(r)
+        vid_trips[r['trip_id']] = r['vid']
+
+    def make_stats(_readings):
+
+        out = {}
+        for key, val in _readings.items():
+            dist = 0
+            duration = 0
+            energy = 0
+            co2 = 0
+            phases = {"Phase {}".format(i): 0 for i in range(7)}
+            # print(val)
+            start = val[0]['timestamp']
+            for r1, r2 in zip(val, val[1:]):
+                if r1['trip_id'] != r2['trip_id']:
+                    duration += (r1['timestamp'] - start).total_seconds()
+                    start = r2['timestamp']
+                    continue
+                dist += vincenty(r1['pos']['coordinates'], r2['pos']['coordinates']).kilometers
+
+                phases["Phase {}".format(r1[phase])] += 1
+            duration += (val[-1]['timestamp'] - start).total_seconds()
+            m, s = divmod(duration, 60)
+            h, m = divmod(m, 60)
+
+            out[key] = {
+                'Duration': "%d:%02d:%02d" % (h, m, s),
+                'Distance (km)': round(dist, 4),
+                'Energy (W)': energy,
+                'CO2': co2
+
+            }
+            out[key].update({k: "{} ({:.2f}%)".format(v, 100 * v / len(val)) for k, v in phases.items()})
+        return out
+
+    trip_stats = make_stats(trips)
+    vehicle_stats = make_stats(vehicles)
+    aggregate_stats = make_stats({'Aggregate': readings})
     return {
-        'Distance': round(sum(map(lambda x: vincenty(x[0]['coordinates'], x[1]['coordinates']).kilometers,
-                                  zip(pluck(readings, 'pos'), pluck(readings[1:], 'pos')))), 4),
+        'Trips': trip_stats,
+        'Vehicles': vehicle_stats,
+        'Aggregate': aggregate_stats,
+        '_vid_trips': vid_trips
     }
 
 
-def _classify_readings_with_phases_pas(readings):
+def _classify_readings_with_phases_pas(readings, min_phase_time):
+    def check_next_5(start, up=1, s=1):
+        try:
+            return all([readings[start][speed] <= readings[start + up * 1][speed],
+                        readings[start][speed] < readings[start + up * 2][speed] + (s * 0.5),
+                        readings[start][speed] < readings[start + up * 3][speed] + (s * 1.0),
+                        readings[start][speed] < readings[start + up * 4][speed] + (s * 1.5),
+                        readings[start][speed] < readings[start + up * 5][speed] + (s * 2.0)])
+        except IndexError:
+            return False
+
     def idle_pass():
         # do Idle pass
 
         for i in readings:
             if i[speed] == 0:
-                i[phase] = 1
+                i[phase] = 0
             else:
                 i[phase] = 6
 
     def accel_from_stop():
         # do accel from stop
-        acc_start = None
-        acc_finish = None
-        found_start_idle = False
+        acc_start = False
+        use_phase = 1
         for idx, i in enumerate(readings):
-            if idx + 6 > len(readings):
-                break
-            i1, i2, i3, i4, i5 = readings[idx + 1:idx + 6]
-            if i[phase] == 1:
-                found_start_idle = True
-            if found_start_idle and i[phase] != 1:
-                if acc_start is None:
-                    acc_start = idx
-                if all([i[speed] >= i1[speed],
-                        i[speed] > i1[speed],
-                        i[speed] > i2[speed] - 0.5,
-                        i[speed] > i3[speed] - 1,
-                        i[speed] > i4[speed] - 1.5,
-                        i[speed] > i5[speed] - 2.0]):
-                    acc_finish = idx
-                    #     for trips between acc_start and acc_finish, mark phase = 2:
-                    for t in readings[acc_start:acc_finish]:
-                        t[phase] = 2
-                    acc_finish = None
-                    acc_start = None
+            prev = readings[idx - 1]
+            if not acc_start and i[phase] != 0 and prev[phase] == 0:
+                acc_start = True
+                if prev[speed] == 0:
+                    use_phase = 1
+                else:
+                    use_phase = 4
+                prev[phase] = use_phase
+            if acc_start:
+                i[phase] = use_phase
+                # check if we've reached peak accel
+                if check_next_5(idx, -1, 1):  # readings[idx +1][speed] <= i[speed]:
+                    acc_start = False
+                    # mark the previous 5 as 0
+                    for r in range(idx, idx - 5, -1):
+                        readings[r][phase] = 0
+
+                        # if i[phase] == 1:
+                        #     found_start_idle = True
+                        # if found_start_idle and i[phase] != 1:
+                        #     if acc_start is None:
+                        #         acc_start = idx - 1
+                        #     if check_next_5(idx, -1, 1):
+                        #         acc_finish = idx
+                        #         #     for trips between acc_start and acc_finish, mark phase = 2:
+                        #         for t in readings[acc_start:acc_finish]:
+                        #             t[phase] = 2
+                        #         acc_finish = None
+                        #         acc_start = None
 
     def decel_to_stop():
-        dec_start = 1
-        dec_finish = 1
-        found_end_idle = False
-        dec_finish_time_set = False
-        for idx, i in enumerate(reversed(readings)):
-            idx = len(readings) - idx
-            if i[phase] == 1:
-                found_end_idle = True
-            if found_end_idle and i[phase] != 1:
-                if dec_finish_time_set == False:
-                    dec_finish = idx
-                    dec_finish_time_set = True
-                if all([i[speed] >= readings[idx - 1][speed],
-                        i[speed] > readings[idx - 2][speed] - 0.5,
-                        i[speed] > readings[idx - 3][speed] - 1,
-                        i[speed] > readings[idx - 4][speed] - 1.5,
-                        i[speed] > readings[idx - 5][speed] - 2.0]):
-                    dec_start = idx
-                    for j in range(dec_start, dec_finish + 1):
-                        readings[j][phase] = 3
-                    found_end_idle = False
-                    dec_finish_time_set = False
+        decc_start = False
+        use_phase = 1
+        for idx, i in enumerate(readings[-2::-1]):
+            idx = len(readings) - idx - 1
+            prev = readings[idx]
+            if not decc_start and i[speed] > 0 and prev[speed]==0:
+                decc_start = True
+                if prev[speed] == 0:
+                    use_phase = 3
+                else:
+                    use_phase = 5
+                prev[phase] = 3
+            if decc_start:
+                i[phase] = use_phase
+                # check if we've reached peak decel
+                if all([
+                    i[speed] >= readings[idx - 2][speed],
+                    i[speed] > readings[idx - 3][speed] - 0.5,
+                    i[speed] > readings[idx - 4][speed] - 1,
+                    i[speed] > readings[idx - 5][speed] - 1.5,
+                    i[speed] > readings[idx - 6][speed] - 2,
+                ]):  # readings[idx +1][speed] <= i[speed]:
+                    decc_start = False
+                    # mark the previous 5 as 0
+                    # for r in range(idx, idx + 5):
+                    #     readings[r][phase] = 0
+
+    def avgSpeed(l):
+        s = 0
+        for i in l:
+            s += i[speed]
+        return s / len(l)
+
+    def cruise():
+        cruise_start = None
+        stack = []
+        for idx, i in enumerate(readings):
+
+            if i[phase] == 0 and readings[idx - 1][phase] > 1:
+                cruise_start = idx
+                stack.append(readings[idx - 1])
+            if cruise_start:
+                avg = avgSpeed(stack)
+                if avg - 5 < i[speed] < avg + 5:
+                    i[phase] = 2
+                    stack.append(i)
+                else:
+                    cruise_start = False
 
     def accel_decel():
 
@@ -147,27 +247,56 @@ def _classify_readings_with_phases_pas(readings):
                 j = 0
                 if readings[tStart][speed] < readings[tk][speed]:
                     for j in range(tk, tStart, -1):
-                        if all([readings[j][speed] <= readings[j - 1][speed],
-                                readings[j][speed] < readings[j - 2][speed] + 0.5,
-                                readings[j][speed] < readings[j - 3][speed] + 1.0,
-                                readings[j][speed] < readings[j - 4][speed] + 1.5,
-                                readings[j][speed] < readings[j - 5][speed] + 2.0]):
+                        if check_next_5(j, -1, 1):
                             tStart = j
                             break
+                    for j in range(tk, len(readings)):
+                        if check_next_5(j, -1, 1):
+                            tEnd = j
+                            break
+                    if readings[tEnd][phase] == 0:
+                        if readings[tEnd][speed] - readings[tStart][speed] > 10.0:
+                            for j in range(tStart, tEnd):
+                                readings[j][phase] = 4
+                else:
+                    for j in range(tk, tStart, -1):
+                        if check_next_5(j, -1, -1):
+                            tStart = j
+                            break
+                    for j in range(tk, len(readings)):
+                        if check_next_5(j, 1, 1):
+                            tEnd = j
+                            break
+                    if readings[tEnd][phase] == 0:
+                        if readings[tStart][speed] - readings[tEnd][speed] > 10.0:
+                            while readings[tStart][phase] != 0:
+                                tStart += 1
+                            for j in range(tStart, tEnd):
+                                readings[j][phase] = 5
+                tStart = tEnd
+
+    # def cruise_error_filter():
+    #     j = 1
+    #     duration_limit = 4
+    #     for i in range()
 
 
-    def cruise():
-        duration_limit = 4
-
-        for i in readings:
-            if i[phase] == 6:
-                pass
+    # def cruise():
+    #     duration_limit = 4
+    #
+    #     # for i in readings:
+    #     #     if i[phase] == 6:
+    #     #         pass
+    #     c_start = None
+    #     for idx, i in enumerate(readings):
+    #         if i[phase] == 2:
+    #             pass
 
     idle_pass()
     accel_from_stop()
     decel_to_stop()
-    accel_decel()
-    cruise()
+    # accel_decel()
+    # cruise()
 
 
 def _classify_readings_with_phases(readings):

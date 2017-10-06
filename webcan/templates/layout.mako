@@ -14,7 +14,7 @@
 
     <!-- Bootstrap core CSS -->
     <link rel="stylesheet" href="//cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css"/>
-    <link href="//maxcdn.bootstrapcdn.com/bootstrap/4.0.0-alpha.6/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://maxcdn.bootstrapcdn.com/bootstrap/4.0.0-alpha.6/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="//cdnjs.cloudflare.com/ajax/libs/tether/1.4.0/css/tether.min.css"/>
     <script src="//cdnjs.cloudflare.com/ajax/libs/jquery/3.2.1/jquery.min.js"></script>
     <!-- Custom styles for this scaffold -->
@@ -32,7 +32,9 @@
     <script type="text/javascript">
         format.extend(String.prototype, {});
     </script>
-    <!-- PID: ${_pid}-->
+    % if _pid is not undefined:
+        <!-- PID: ${_pid}-->
+    % endif
 </head>
 
 <body>
@@ -44,16 +46,13 @@
             <span class="navbar-toggler-icon"></span>
         </button>
 
-        <a class="navbar-brand" href="#">
+        <a class="navbar-brand" href="/">
             <i class="fa fa-car" style="color:#689F38" aria-hidden="true"></i>
             WebCAN Viewer
         </a>
 
         <div class="collapse navbar-collapse">
             <ul class="navbar-nav mr-auto">
-                <li class="nav-item active">
-                    <a class="nav-link" href="/">Home <span class="sr-only">(current)</span></a>
-                </li>
                 <li class="nav-item dropdown">
                     <a class="nav-link dropdown-toggle" href="/dev" id="dropdown01" data-toggle="dropdown"
                        aria-haspopup="true" aria-expanded="false">Devices</a>
@@ -73,9 +72,9 @@
             </ul>
             <ul class="nav navbar-nav navbar-right">
                 %if request.authenticated_userid:
-                    %if request.user['level'] == 'admin':
-                        <li class="nav-item"><a class="nav-link" href="/users">Users</a></li>
-                    %endif
+                %if request.user['level'] == 'admin':
+                    <li class="nav-item"><a class="nav-link" href="/users">Users</a></li>
+                %endif
                     <li class="nav-item"><a class="nav-link" href="/logout">Logout</a></li>
                 %endif
 

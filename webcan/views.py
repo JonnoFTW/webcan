@@ -69,7 +69,10 @@ def show_device(request):
 
     return {
         'device': device_id,
-        'trips': sorted(request.db['rpi_readings'].distinct('trip_id', {'vid': device_id, 'pos': {'$ne': None}}),
+        'trips': sorted(request.db['rpi_readings'].distinct('trip_id',
+                                                            {'vid': device_id,
+                                                             'pos': {'$ne': None}}
+                                                            ),
                         reverse=True)
     }
 
@@ -77,27 +80,61 @@ def show_device(request):
 @view_config(route_name='trip_json', renderer='bson')
 def trip_json(request):
     trip_id = request.matchdict.get('trip_id', None)
-    readings_query = {'trip_id': trip_id, 'pos': {'$ne': None}}
+    readings_query = {'trip_id': trip_id,'pos': {'$ne': None}}
     readings = list(
         request.db['rpi_readings'].find(readings_query, {'_id': False, 'vid': False, 'trip_id': False}).sort(
             [('trip_sequence', pymongo.ASCENDING)]))
-    return {'readings': readings}
+    out = []
+    for r in readings:
+        if 'pos' not in r and 'latitude' in r:
+            r['pos'] = {
+                'type': 'Point',
+                'coordinates': [r['longitude'], r['latitude']]
+            }
+            del r['latitude']
+            del r['longitude']
+        out.append(r)
+    return {'readings': out}
 
 
 def _prep_csv(query, header, rows):
     vid = None
     for row in query:
-        row['latitude'] = row['pos']['coordinates'][1]
-        row['longitude'] = row['pos']['coordinates'][0]
+        if 'pos' in row:
+            row['latitude'] = row['pos']['coordinates'][1]
+            row['longitude'] = row['pos']['coordinates'][0]
+
         vid = row['vid']
         for f in ['vid', 'pos', 'trip_id']:
-            del row[f]
+            if f in row:
+                del row[f]
 
         header.update(row.keys())
-        rows.append(row)
+        rows[row['trip_sequence']] = row
+    # print("Headers are:", header)
     return vid
 
 
+@view_config(route_name='fix_pos', renderer='bson')
+def fix_pos(request):
+    # request all those data with latitude and longitude set without pos
+    query = {'pos': {'$exists': False}, 'latitude': {'$ne':0.0}}
+    data = list(request.db.rpi_readings.find(query))
+    # do this:
+    """
+    db.getCollection('rpi_readings').find({'pos': {'$exists': false}, 'latitude': {'$exists':true}}).snapshot().forEach(
+    function(elem) {
+        db.rpi_readings.update({_id:elem._id},
+            {$set:{pos:{
+                'type':'Point',
+                'coordinates':[elem.longitude,elem.latitude]
+                }},
+                $unset:{latitude:"",longitude:""}
+        })
+    }
+)
+"""
+    return {'data': data}
 @view_config(route_name='trip_csv', renderer='csv')
 def trip_csv(request):
     trip_id = request.matchdict.get('trip_id')
@@ -105,19 +142,20 @@ def trip_csv(request):
     # override attributes of response
     # iterate through the data, make a set of headers seen
     header = set()
-    rows = []
-    query = request.db.rpi_readings.find({'trip_id': trip_id, 'pos': {'$ne': None}}, {'_id': False}).sort(
+    rows = {}
+    query = request.db.rpi_readings.find({'trip_id': trip_id,'pos': {'$ne': None}}, {'_id': False}).sort(
         [('trip_sequence', pymongo.ASCENDING)])
     vid = _prep_csv(query, header, rows)
-
     filename = '{}_{}.csv'.format(vid.replace(' ', '_'), trip_id)
     request.response.content_disposition = 'attachment;filename=' + filename
     # put GPS fields first
-    headers = ['trip_sequence', 'timestamp', 'latitude', 'longitude', 'altitude', 'spd_over_grnd',
-               'true_course'] + sorted(header)[:-6]
+    to_front = ['trip_sequence', 'timestamp', 'latitude', 'longitude', 'altitude', 'spd_over_grnd', 'num_sats']
+    for i in to_front:
+        header.remove(i)
+    headers = to_front + sorted(header)
     return {
         'header': headers,
-        'rows': rows,
+        'rows': sorted(rows.values(),key=lambda x:x['trip_sequence']),
     }
 
 
