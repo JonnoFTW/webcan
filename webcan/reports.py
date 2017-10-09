@@ -75,6 +75,8 @@ def _summarise_readings(readings):
 
         out = {}
         for key, val in _readings.items():
+            if not val:
+                continue
             dist = 0
             duration = 0
             energy = 0
