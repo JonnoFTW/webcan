@@ -34,7 +34,8 @@ def main(global_config, **settings):
     config.add_route('map', '/map')
 
     config.add_route('user_list', '/users')
-    config.add_route('user_manage', '/users/{user_id}')
+    config.add_route('user_manage', '/users/v/{user_id}')
+    config.add_route('user_add', '/users/add')
 
     config.add_route('trip_csv', '/trip/{trip_id}.csv')
     config.add_route('trip_json', '/trip/{trip_id}.json')
@@ -45,7 +46,8 @@ def main(global_config, **settings):
     config.add_route('report_phase', '/report/phase')
 
     config.add_route('api_upload', '/api/upload')
-    config.add_route('fix_pos','/fix_pos')
+    config.add_route('fix_pos', '/fix_pos')
+
     def add_db(request):
         conn = MongoClient(db_url.geturl())
         db = conn[db_url.path[1:]]
@@ -66,7 +68,7 @@ def main(global_config, **settings):
         if user is not None:
             return ['auth']
 
-    auth_policy = AuthTktAuthenticationPolicy('r4k4j5k4j56t5^%TGGfgrtRDFr', callback=auth_callback, hashalg='sha512')
+    auth_policy = AuthTktAuthenticationPolicy(settings['auth_ticket_key'], callback=auth_callback, hashalg='sha512')
     config.set_authentication_policy(auth_policy)
     config.set_authorization_policy(ACLAuthorizationPolicy())
 

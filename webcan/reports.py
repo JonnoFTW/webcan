@@ -7,8 +7,9 @@ from collections import deque, defaultdict
 from pluck import pluck
 import numpy as np
 import pymongo
+from itertools import filterfalse
 
-speed = 'PID_SPEED (km/h)'
+
 phase = 'phase'
 trip_sequence = 'trip_sequence'
 
@@ -34,7 +35,6 @@ def phase_classify(request):
 @view_config(route_name='report_phase', request_method='POST', renderer="bson")
 def phase_classify_render(request):
     query = {
-        'PID_SPEED (km/h)': {'$ne': None},
         'timestamp': {'$exists': True, '$ne': None},
         'pos': {'$ne': None}
     }
@@ -46,11 +46,12 @@ def phase_classify_render(request):
         query['vid'] = {'$in': request.POST.getall('devices[]')}
     readings = list(request.db.rpi_readings.find(query,
                                                  {'_id': False}).sort([('timestamp', pymongo.ASCENDING)]))
-    _classify_readings_with_phases_pas(readings, min_phase_time)
+    speed = _classify_readings_with_phases_pas(readings, min_phase_time)
     summary = _summarise_readings(readings)
     return {
         'readings': readings,
-        'summary': summary
+        'summary': summary,
+        'speed_field': speed
     }
 
 
@@ -118,6 +119,25 @@ def _summarise_readings(readings):
 
 
 def _classify_readings_with_phases_pas(readings, min_phase_time):
+    speed = 'PID_SPEED (km/h)'
+    tesla_speed_pid = 'PID_TESLA_REAR_DRIVE_UNIT_TORQUE_STATUS (vehicleSpeed km/h)'
+    _readings = []
+    for i in readings:
+        if speed not in i:
+            # set the PID_SPEED km/h from the data we have
+            if 'tesla' in i['vid'] and tesla_speed_pid in i:
+                speed = tesla_speed_pid
+            elif 'FMS_TACOGRAPH (km/h)' in i:
+                speed = 'FMS_TACOGRAPH (km/h)'
+            else:
+                speed = 'spd_over_grnd'
+
+        if i[speed] is not None:
+            i['speed'] = i[speed]
+            _readings.append(i)
+
+    readings[:] = _readings
+    speed = 'speed'
     def check_next_5(start, up=1, s=1):
         try:
             return all([readings[start][speed] <= readings[start + up * 1][speed],
@@ -130,9 +150,8 @@ def _classify_readings_with_phases_pas(readings, min_phase_time):
 
     def idle_pass():
         # do Idle pass
-
         for i in readings:
-            if i[speed] == 0:
+            if i[speed] <= 1:
                 i[phase] = 0
             else:
                 i[phase] = 6
@@ -145,7 +164,7 @@ def _classify_readings_with_phases_pas(readings, min_phase_time):
             prev = readings[idx - 1]
             if not acc_start and i[phase] != 0 and prev[phase] == 0:
                 acc_start = True
-                if prev[speed] == 0:
+                if prev[speed] <= 2:
                     use_phase = 1
                 else:
                     use_phase = 4
@@ -176,17 +195,14 @@ def _classify_readings_with_phases_pas(readings, min_phase_time):
         decc_start = False
         use_phase = 1
         for idx, i in enumerate(readings[-2::-1]):
+
             idx = len(readings) - idx - 1
             prev = readings[idx]
-            if not decc_start and i[speed] > 0 and prev[speed]==0:
+            if not decc_start and i[speed] > 0 and prev[speed] < 1:
                 decc_start = True
-                if prev[speed] == 0:
-                    use_phase = 3
-                else:
-                    use_phase = 5
-                prev[phase] = 3
+                continue
             if decc_start:
-                i[phase] = use_phase
+                i[phase] = 3
                 # check if we've reached peak decel
                 if all([
                     i[speed] >= readings[idx - 2][speed],
@@ -225,11 +241,11 @@ def _classify_readings_with_phases_pas(readings, min_phase_time):
     def accel_decel():
 
         # classify intermediate accel decel
-        tStart = 1
-        tk = 1
-        tEnd = 1
-        tMin = 1
-        tMax = 1
+        tStart = 0
+        tk = 0
+        tEnd = 0
+        tMin = 0
+        tMax = 0
         for idx, i in enumerate(readings):
             if i == tStart:
                 j = 0
@@ -246,20 +262,20 @@ def _classify_readings_with_phases_pas(readings, min_phase_time):
                     while not (readings[j][speed] >= vxa):
                         j += 1
                 tk = j
-                j = 0
                 if readings[tStart][speed] < readings[tk][speed]:
-                    for j in range(tk, tStart, -1):
-                        if check_next_5(j, -1, 1):
-                            tStart = j
-                            break
-                    for j in range(tk, len(readings)):
-                        if check_next_5(j, -1, 1):
-                            tEnd = j
-                            break
-                    if readings[tEnd][phase] == 0:
-                        if readings[tEnd][speed] - readings[tStart][speed] > 10.0:
-                            for j in range(tStart, tEnd):
-                                readings[j][phase] = 4
+                    pass
+                    # for j in range(tk, tStart, -1):
+                    #     if check_next_5(j, -1, 1):
+                    #         tStart = j
+                    #         break
+                    # for j in range(tk, len(readings)):
+                    #     if check_next_5(j, -1, 1):
+                    #         tEnd = j
+                    #         break
+                    # if readings[tEnd][phase] == 0:
+                    #     if readings[tEnd][speed] - readings[tStart][speed] > 10.0:
+                    #         for j in range(tStart, tEnd):
+                    #             readings[j][phase] = 4
                 else:
                     for j in range(tk, tStart, -1):
                         if check_next_5(j, -1, -1):
@@ -276,6 +292,7 @@ def _classify_readings_with_phases_pas(readings, min_phase_time):
                             for j in range(tStart, tEnd):
                                 readings[j][phase] = 5
                 tStart = tEnd
+    # def int_decel():
 
     # def cruise_error_filter():
     #     j = 1
@@ -283,34 +300,35 @@ def _classify_readings_with_phases_pas(readings, min_phase_time):
     #     for i in range()
 
 
-    # def cruise():
-    #     duration_limit = 4
-    #
-    #     # for i in readings:
-    #     #     if i[phase] == 6:
-    #     #         pass
-    #     c_start = None
-    #     for idx, i in enumerate(readings):
-    #         if i[phase] == 2:
-    #             pass
+    def cruise():
+        duration_limit = 4
+
+        # for i in readings:
+        #     if i[phase] == 6:
+        #         pass
+        c_start = None
+        for idx, i in enumerate(readings):
+            if i[phase] == 0 and i[speed] > 5:
+                i[phase] = 2
 
     idle_pass()
     accel_from_stop()
     decel_to_stop()
-    # accel_decel()
-    # cruise()
+    accel_decel()
+    cruise()
+    return speed
 
 
 def _classify_readings_with_phases(readings):
     """
     Classify readings with the following schema:
-       -1. N/A
         0. Idle at 0
         1. Acceleration from 0
         2. Cruise
         3. Deceleration to 0
         4. Intermediate acceleration
         5. Intermediate deceleration
+        6. N/A
     """
 
     # load into numpy

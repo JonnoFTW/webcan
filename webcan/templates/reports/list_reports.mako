@@ -6,14 +6,16 @@
                 <div class="card-header">
                     Reports
                 </div>
-            </div>
-            <div class="card-block">
-                Reports
-                <ul>
-                    %for r in reports:
-                        <li> <a href="${r['pattern']}">${r['name'].replace('_',' ').title()}</a></li>
-                    %endfor
-                </ul>
+
+                <div class="card-block">
+                    <div class="row">
+                        <ul>
+                            %for r in reports:
+                                <li><a href="${r['pattern']}">${r['name'].replace('_',' ').title()}</a></li>
+                            %endfor
+                        </ul>
+                    </div>
+                </div>
             </div>
         </div>
     </div>

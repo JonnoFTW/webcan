@@ -35,9 +35,14 @@
         var readings = mReadings;
         var data = new google.visualization.DataTable();
         data.addColumn('datetime', 'Time');
+        var vaxes = {};
+        var series = {};
         var fields_using = $('#select-y').val();
-        _.forEach(fields_using, function(v) {
+        _.forEach(fields_using, function(v, idx) {
             data.addColumn('number', v);
+            vaxes[idx] = {title: v};
+            series[idx] = {targetAxisIndex:idx};
+
         });
         var fields = {};
         _.forEach(readings, function (v) {
@@ -54,13 +59,16 @@
         $('#select-y').select2({
             data: _.keys(fields)
         });
+        var title = _.join(_.map(fields_using, function(x){return _.last(x.split(" "));} ), ', ');
         var options = {
-            title: 'Speed vs. Time',
+            title: title + ' vs. Time',
             curveType: 'function',
             animation:{
                 duration: 100,
                 startup: true
             },
+            vAxes: vaxes,
+            series: series,
             explorer: {
                 actions: ['dragToZoom', 'rightClickToReset'],
                 axis: 'horizontal',
@@ -111,7 +119,7 @@
         }).on('select2:select', function (evt) {
             load_trip($(this).val());
         });
-        $('#select-y').select2().on('select2:select', function(evt) {
+        $('#select-y').select2().on('select2:select select2:unselect', function(evt) {
            do_chart();
         });
         $('.map-load').click(function () {

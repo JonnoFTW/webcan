@@ -42,9 +42,8 @@ def _get_user_devices(request):
 def check_logged_in(event):
     # if the user is not logged in and tries to access anything but /login,
     # redirect to /loging or send ajax error about not being logged in
-
     req = event.request
-    if req.path in ('/login', '/logout'):
+    if req.path in ('/login', '/logout', '/api/upload'):
         return
     if not req.user:
         if req.is_xhr:
@@ -332,6 +331,25 @@ def user_list(request):
         'user_levels': USER_LEVELS,
         'login_types': LOGIN_TYPES
     }
+
+
+@view_config(route_name='user_add', renderer='bson')
+def user_add(request):
+    new_fan = request.POST.get('fan', None)
+    if new_fan is None or request.db.webcan_users.find_one({'username': new_fan}) is not None:
+        return {
+            'err': 'Empty or existing usernames cannot be used again'
+        }
+    new_user_obj = {
+        'username': new_fan,
+        'login': 'ldap',
+        'devices': [],
+        'secret': secrets.token_hex(32),
+        'level': 'viewer'
+    }
+
+    request.db.webcan_users.insert_one(new_user_obj)
+    return new_user_obj
 
 
 def check_pass(password, hashed):

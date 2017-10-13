@@ -35,7 +35,7 @@
                                 </select>
 
                             </div>
-                            <div class="form-group col-12">
+                            <div class="form-group col-12" id="load-button">
                                 <button class="btn btn-primary" id="load-phases">Load</button>
                                  <i id="load-icon" class="fa fa-refresh fa-spin fa-fw" style="display:none"></i>
                             </div>
@@ -73,7 +73,7 @@
 <script type="text/javascript">
     google.charts.load('current', {'packages': ['corechart']});
     var phases = ['Idle', 'Acc from zero', 'Cruise', 'Dec to zero', 'Int Acc', 'Int Dec', 'N/A'];
-
+    var speed_field = null;
     function drawChart(readings) {
         var data = new google.visualization.DataTable();
         data.addColumn('datetime', 'time', 'Time');
@@ -87,7 +87,7 @@
             var phase = r['phase'],
                 ##                 time  = moment.unix(r.timestamp['$date']/1000),
                 time = new Date(r.timestamp.$date),
-                    speed = r['PID_SPEED (km/h)'];
+                    speed = r[speed_field];
 
             var row = new Array(data.ng.length).fill({v: null});
             row[0] = {v: time};
@@ -114,7 +114,7 @@
             vAxis: {title: 'Speed', minValue: 0, maxValue: 80},
             legend: 'right',
 
-            colors: ['#212121', '#009688', '#D81B60', '#5E35B1', '#E53935', '#43A047', '#616161']
+            colors: ['#212121', '#009688', '#D81B60', '#5E35B1', '#DCE775', '#43A047', '#616161']
         };
 
         var chart = new google.visualization.ScatterChart(document.getElementById('chart_div'));
@@ -125,7 +125,8 @@
         $('select').select2({allowClear: true, placeholder: 'Leave blank to ignore field'});
         <%include file="../export_map.js"/>
         $('#load-phases').click(function () {
-            $('#load-icon').toggle();
+            $('#load-icon').show();
+            $('.alert').alert('close');
             $.post('/report/phase', {
                 'trips': $('#select-trips').val(),
                 'devices': $('#select-vids').val(),
@@ -134,6 +135,7 @@
             }, function (data) {
                 $stat_tables = $('#stat-tables');
                 $stat_tables.empty();
+                speed_field = data.speed_field;
                 _.forEach(data.summary, function (thing_stats, stat_type) {
                     if (stat_type.startsWith('_')) {
                         return;
@@ -175,8 +177,18 @@
 
                 });
                 drawChart(data['readings']);
-                $('#load-icon').toggle();
-            })
+
+            }).fail(function(err) {
+               //
+                console.log(err, text);
+                $('#load-button').append(
+                '<div class="alert alert-danger" role="alert">\n' +
+                '  <strong>Error</strong> {}.\n'.format(text) +
+                '</div>');
+                $('.alert').alert();
+            }).always(function() {
+                $('#load-icon').hide();
+            });
         });
     });
 </script>

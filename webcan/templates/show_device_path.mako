@@ -53,13 +53,13 @@
     var generateIcon = function (reading) {
         var canvas = document.createElement('canvas');
         var label = String(reading.trip_sequence)
-        var width = 32;
-        var height = 32;
+        var width = 30;
+        var height = 30;
         canvas.width = width;
         canvas.height = height;
         var midx = width / 2;
         var midy = height / 2;
-        var speed = reading['PID_SPEED (km/h)'];
+        var speed = reading['spd_over_grnd'];
         if (!speed) {
             speed = 0;
         }
@@ -112,7 +112,7 @@
             if (_.has(reading, 'latitude')) {
                 reading.lat = reading.latitude;
                 reading.lng = reading.longitude;
-            } else if(_.has(reading, 'pos')){
+            } else if(_.has(reading, 'pos')) {
                 reading.lat = reading.pos.coordinates[1];
                 reading.lng = reading.pos.coordinates[0];
             } else {
@@ -145,7 +145,7 @@
 
                 tooltip += "<b>{}: </b> {} {}<br>".format(k, v, suffix);
             });
-            markers.push({
+            map.addMarker( {
                 lat: reading.lat,
                 lng: reading.lng,
                 icon: generateIcon(reading),
@@ -153,8 +153,9 @@
                     content: tooltip
                 }
             });
+##             markers.push();
         });
-        map.addMarkers(markers);
+##         map.addMarkers(markers);
         return out;
     }
 </script>
