@@ -6,6 +6,7 @@ from ldap3 import Server, Connection, ALL, NTLM
 import pyramid.httpexceptions as exc
 from datetime import datetime
 from pluck import pluck
+import platform
 import secrets
 import bcrypt
 import os
@@ -58,6 +59,7 @@ def check_logged_in(event):
 def add_device_global(event):
     if event['renderer_info'].type == '.mako':
         event['_pid'] = os.getpid()
+        event['_host'] = platform.node()
         if event['request'].user is not None:
             event['devices'] = event['request'].user['devices']
 
