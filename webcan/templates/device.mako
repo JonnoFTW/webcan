@@ -38,34 +38,45 @@
         var vaxes = {};
         var series = {};
         var fields_using = $('#select-y').val();
-        _.forEach(fields_using, function(v, idx) {
+        _.forEach(fields_using, function (v, idx) {
             data.addColumn('number', v);
+
             vaxes[idx] = {title: v};
-            series[idx] = {targetAxisIndex:idx};
+            if (idx >1)
+                vaxes[idx].textPosition=  'in';
+            series[idx] = {targetAxisIndex: idx};
 
         });
         var fields = {};
         _.forEach(readings, function (v) {
             var row = [new Date(v.timestamp)];
-            _.forEach(fields_using, function(f) {
+            _.forEach(fields_using, function (f) {
                 row.push(v[f]);
             });
             data.addRow(row);
-            _.each(v, function(value, key) {
+            _.each(v, function (value, key) {
                 fields[key] = 1;
-            }) ;
+            });
         });
         // set all the fields in
         $('#select-y').select2({
             data: _.keys(fields)
         });
-        var title = _.join(_.map(fields_using, function(x){return _.last(x.split(" "));} ), ', ');
+        var title = _.join(fields_using, ', ');
         var options = {
             title: title + ' vs. Time',
             curveType: 'function',
-            animation:{
+            animation: {
                 duration: 100,
                 startup: true
+            },
+            chartArea: {
+                width: '95%',
+                height: '100%',
+                top: 72,
+                left: 60,
+                bottom: 48,
+                right: 84
             },
             vAxes: vaxes,
             series: series,
@@ -75,7 +86,7 @@
                 keepInBounds: true,
                 maxZoomIn: 0
             },
-            legend: {position: 'bottom'}
+            legend: {position: 'top'}
         };
 
         var chart = new google.visualization.LineChart(document.getElementById('chart'));
@@ -87,7 +98,7 @@
         window.location.hash = '#{}'.format(trip_id);
         $('#csv-link').html('<i class="fa fa-spinner fa-pulse fa-fw"></i>\n' +
                 '<span class="sr-only">Loading...</span>');
-        if(!trip_id) {
+        if (!trip_id) {
             return;
         }
         $.getJSON("/trip/{}.json".format(trip_id), function (readings) {
@@ -119,8 +130,8 @@
         }).on('select2:select', function (evt) {
             load_trip($(this).val());
         });
-        $('#select-y').select2().on('select2:select select2:unselect', function(evt) {
-           do_chart();
+        $('#select-y').select2().on('select2:select select2:unselect', function (evt) {
+            do_chart();
         });
         $('.map-load').click(function () {
             load_trip($(this).data('trip'));

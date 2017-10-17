@@ -8,10 +8,16 @@ import gzip
 @view_config(route_name='api_upload', renderer="json")
 def upload_vehicle(request):
     # take in some gzipped data that is base64 encoded
-    keys = request.POST.getall('keys')
+    keys = request.POST.get('keys')
+    if keys is None:
+        return HTTPBadRequest("Please specify the device keys")
+    keys = keys.split(",")
     # if key != request.db['webcan_devices'].find()
     # we receive the data as base 64 encoded gzipped json object rows
-    data64 = bytes(request.POST.get('data'), 'ascii')
+    data = request.POST.get('data')
+    if data is None:
+        return HTTPBadRequest("Please provide a data value")
+    data64 = bytes(data, 'ascii')
 
     device_ids = set([])
     trips = set()
