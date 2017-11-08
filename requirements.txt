@@ -1,3 +1,4 @@
+dateutil
 pyramid
 pyramid_mako
 pyramid_debugtoolbar
@@ -9,3 +10,5 @@ ldap
 pluck
 numpy
 scipy
+geopy
+git+https://github.com/Supervisor/supervisor.git

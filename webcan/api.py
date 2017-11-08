@@ -3,6 +3,7 @@ from pyramid.httpexceptions import HTTPForbidden, HTTPBadRequest
 import json
 import base64
 import gzip
+import dateutil.parser
 
 
 @view_config(route_name='api_upload', renderer="json")
@@ -23,18 +24,31 @@ def upload_vehicle(request):
     trips = set()
     rows = []
     for row in gzip.decompress(base64.b64decode(data64)).decode('ascii').splitlines():
-        js = json.loads(row)
+        try:
+            js = json.loads(row)
+        except json.JSONDecodeError as e:
+            print("Could not decode '{}': {}".format(row, e))
+            continue
         if 'vid' not in js or 'trip_id' not in js:
             return HTTPBadRequest("Please provide a vid and trip_id on every row")
+        if 'timestamp' in js and js['timestamp'] is not None:
+
+            js['timestamp'] = dateutil.parser.parse(js['timestamp'])
+        else:
+            continue
         device_ids.add(js['vid'])
         trips.add(js['trip_id'])
+
+
         rows.append(js)
     # check if we have all the appropriate keys for the devices we want to add
-    for device in request.db.webcan_devices.find({'name': {'$in': device_ids}}):
+    for device in request.db.webcan_devices.find({'name': {'$in': list(device_ids)}}):
         if device['secret'] not in keys:
             return HTTPForbidden('You must provide a valid API key for all Vehicle IDs used')
 
-    return
-    request.db.rpi_readings.delete({'trip_id': {'$in': trips}})
-    return request.db.insert_many(rows)
+    request.db.rpi_readings.remove({'trip_id': {'$in': list(trips)}})
+    res = request.db.rpi_readings.insert_many(rows)
+    return {
+        'inserted': len(res.inserted_ids)
+    }
 

@@ -42,8 +42,8 @@
             data.addColumn('number', v);
 
             vaxes[idx] = {title: v};
-            if (idx >1)
-                vaxes[idx].textPosition=  'in';
+            if (idx > 1)
+                vaxes[idx].textPosition = 'in';
             series[idx] = {targetAxisIndex: idx};
 
         });
@@ -117,32 +117,36 @@
         });
     };
     $(document).ready(function () {
-        google.charts.load('current', {'packages': ['corechart']});
-        map = new GMaps({
-            div: '#map',
-            lat: lat,
-            lng: lng,
-            zoom: 16
+        google.charts.load('current', {
+            'packages': ['corechart'], 'callback': function () {
+                map = new GMaps({
+                    div: '#map',
+                    lat: lat,
+                    lng: lng,
+                    zoom: 16
+                });
+                $sel = $('#select-trip');
+                $sel.select2({
+                    width: '340px'
+                }).on('select2:select', function (evt) {
+                    load_trip($(this).val());
+                });
+                $('#select-y').select2().on('select2:select select2:unselect', function (evt) {
+                    do_chart();
+                });
+                $('.map-load').click(function () {
+                    load_trip($(this).data('trip'));
+                });
+                if (window.location.hash !== "") {
+                    // load up that
+                    var trip_id = window.location.hash.substr(1);
+                    $sel.val(trip_id).trigger('select2:select');
+                } else {
+                    load_trip($sel.val());
+                }
+            }
         });
-        $sel = $('#select-trip');
-        $sel.select2({
-            width: '340px'
-        }).on('select2:select', function (evt) {
-            load_trip($(this).val());
-        });
-        $('#select-y').select2().on('select2:select select2:unselect', function (evt) {
-            do_chart();
-        });
-        $('.map-load').click(function () {
-            load_trip($(this).data('trip'));
-        });
-        if (window.location.hash !== "") {
-            // load up that
-            var trip_id = window.location.hash.substr(1);
-            $sel.val(trip_id).trigger('select2:select');
-        } else {
-            load_trip($sel.val());
-        }
+
     });
 
 </script>

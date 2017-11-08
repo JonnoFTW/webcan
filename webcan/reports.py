@@ -2,7 +2,7 @@ from datetime import timedelta
 
 from .views import get_device_trips_for_user
 from pyramid.view import view_config
-from geopy.distance import vincenty
+from geopy.distance import vincenty, GreatCircleDistance
 from collections import deque, defaultdict
 from pluck import pluck
 import numpy as np
@@ -121,12 +121,15 @@ def _summarise_readings(readings):
 def _classify_readings_with_phases_pas(readings, min_phase_time):
     speed = 'PID_SPEED (km/h)'
     tesla_speed_pid = 'PID_TESLA_REAR_DRIVE_UNIT_TORQUE_STATUS (vehicleSpeed km/h)'
+    fms_cc_speed = 'FMS_CRUISE_CONTROL_VEHICLE_SPEED (km/h)'
     _readings = []
     for i in readings:
         if speed not in i:
             # set the PID_SPEED km/h from the data we have
-            if 'tesla' in i['vid'] and tesla_speed_pid in i:
+            if tesla_speed_pid in i:
                 speed = tesla_speed_pid
+            elif fms_cc_speed in i and i[fms_cc_speed] < 200:
+                speed = 'FMS_CRUISE_CONTROL_VEHICLE_SPEED (km/h)'
             elif 'FMS_TACOGRAPH (km/h)' in i:
                 speed = 'FMS_TACOGRAPH (km/h)'
             else:

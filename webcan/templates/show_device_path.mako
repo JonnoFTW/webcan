@@ -122,6 +122,9 @@
                 return;
             }
             out.push(reading);
+            if(!_.has(reading, 'timestamp')) {
+                return;
+            }
             reading.timestamp = moment.unix(reading.timestamp['$date'] / 1000);
             if (last !== null) {
                 reading.time_diff = "{}s".format(reading.timestamp.diff(last.timestamp, 'seconds', true));
