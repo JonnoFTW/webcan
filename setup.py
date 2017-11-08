@@ -17,7 +17,7 @@ tests_require = [
     ]
 
 setup(name='webcan',
-      version='0.0',
+      version='0.1',
       description='webcan',
       long_description=README + '\n\n' + CHANGES,
       classifiers=[
@@ -26,7 +26,7 @@ setup(name='webcan',
           "Topic :: Internet :: WWW/HTTP",
           "Topic :: Internet :: WWW/HTTP :: WSGI :: Application",
       ],
-      author='',
+      author='Jonathan Mackenzie',
       author_email='',
       url='',
       keywords='web pyramid pylons',

@@ -16,11 +16,13 @@ def main(global_config, **settings):
     """
     config = Configurator(settings=settings)
     config.include('pyramid_mako')
+    import os
     if 'mongo_uri' in settings:
         db_url = urlparse(settings['mongo_uri'])
     else:
-        import os
         db_url = urlparse(os.getenv("WEBCAN_MONGO_URI"))
+        settings['ldap_server'] = os.getenv('LDAP_SERVER')
+        settings['ldap_suffix'] = os.getenv('LDAP_USERNAME_SUFFIX')
 
     config.add_static_view('static', 'static', cache_max_age=3600)
     config.add_route('home', '/')

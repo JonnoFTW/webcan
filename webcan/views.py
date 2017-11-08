@@ -266,7 +266,10 @@ def login(request):
             user = request.db['webcan_users'].find_one({'username': username})
             if user is not None:
                 if user.get('login', None) == 'ldap':
-                    is_valid = check_credentials(username, password)
+                    is_valid = check_credentials(username,
+                                                 password,
+                                                 request.registry.settings['ldap_server'],
+                                                 request.registry.settings['ldap_suffix'])
                 else:  # if user['login'] == 'external':
                     is_valid = check_pass(password, user['password'])
                 if is_valid:
@@ -359,12 +362,12 @@ def check_pass(password, hashed):
     # return hashlib.sha512(password.encode()).hexdigest()
 
 
-def check_credentials(username, password):
+def check_credentials(username, password, ldap_server, ldap_suffix):
     """Verifies credentials for username and password.
     Returns True on success or False on failure
     """
-    ldap_user = '\\{}@flinders.edu.au'.format(username)
-    server = Server('ad.flinders.edu.au', use_ssl=True)
+    ldap_user = '\\{}@{}'.format(username, ldap_suffix)
+    server = Server(ldap_server, use_ssl=True)
 
     connection = Connection(server, user=ldap_user, password=password, authentication=NTLM)
     try:
