@@ -83,7 +83,6 @@
         }
         var rows = [];
         var trips = new Set();
-        var idx = 0;
         _.map(readings, function (r) {
             var phase = r['phase'],
                 ##                 time  = moment.unix(r.timestamp['$date']/1000),
@@ -93,7 +92,7 @@
             var row = new Array(data.ng.length).fill({v: null});
             row[0] = {v: time};
             row[(phase) * 2 + 1] = {v: speed};
-            row[(phase)* 2 + 2] = {v: '<div style="padding: 5px; width: 125px"><b>{0} ({2})</b> <br> {1} km/h ({3})</div>'.format(phases[phase], speed, phase,idx++ )};
+            row[(phase)* 2 + 2] = {v: '<div style="padding: 5px; width: 125px"><b>{0} ({2})</b> <br> {1} km/h ({3})</div>'.format(phases[phase], speed, phase,r['idx'] )};
 
             ##             console.log(row);
             data.addRow(row);

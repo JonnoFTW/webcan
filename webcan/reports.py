@@ -124,6 +124,7 @@ def _classify_readings_with_phases_pas(readings, min_phase_time):
     fms_cc_speed = 'FMS_CRUISE_CONTROL_VEHICLE_SPEED (km/h)'
     fms_tac = 'FMS_TACOGRAPH (km/h)'
     _readings = []
+    idx = 0
     for i in readings:
         if speed not in i:
             # set the PID_SPEED km/h from the data we have
@@ -138,6 +139,8 @@ def _classify_readings_with_phases_pas(readings, min_phase_time):
 
         if i[speed] is not None:
             i['speed'] = i[speed]
+            i['idx'] = idx
+            idx += 1
             _readings.append(i)
 
     readings[:] = _readings
