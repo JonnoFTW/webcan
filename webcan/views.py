@@ -266,10 +266,12 @@ def login(request):
             user = request.db['webcan_users'].find_one({'username': username})
             if user is not None:
                 if user.get('login', None) == 'ldap':
-                    is_valid = check_credentials(username,
+                    is_valid, err = check_credentials(username,
                                                  password,
                                                  request.registry.settings['ldap_server'],
                                                  request.registry.settings['ldap_suffix'])
+                    if err is not None:
+                        message = err
                 else:  # if user['login'] == 'external':
                     is_valid = check_pass(password, user['password'])
                 if is_valid:
@@ -369,9 +371,10 @@ def check_credentials(username, password, ldap_server, ldap_suffix):
     ldap_user = '\\{}@{}'.format(username, ldap_suffix)
     server = Server(ldap_server, use_ssl=True)
 
-    connection = Connection(server, user=ldap_user, password=password, authentication=NTLM)
+    connection = Connection(server, user=ldap_user, password=password, authentication=NTLM, receive_timeout=5)
     try:
-        return connection.bind()
-    except:
-        print("LDAP Error: ", connection.result)
-        return False
+        return connection.bind(), None
+    except Exception as e:
+
+        print("LDAP Error: ", connection.result, e)
+        return False, "LDAP Error: "+str(e)

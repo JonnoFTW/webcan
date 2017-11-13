@@ -51,7 +51,10 @@ def main(global_config, **settings):
     config.add_route('fix_pos', '/fix_pos')
 
     def add_db(request):
-        conn = MongoClient(db_url.geturl())
+        conn = MongoClient(db_url.geturl(),
+                           serverSelectionTimeoutMS=2500,
+                           connectTimeoutMS=2500,
+                           socketTimeoutMS=2500)
         db = conn[db_url.path[1:]]
 
         def conn_close(request):
