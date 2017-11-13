@@ -1,4 +1,4 @@
-dateutil
+python-dateutil
 pyramid
 pyramid_mako
 pyramid_debugtoolbar

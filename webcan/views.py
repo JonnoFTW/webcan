@@ -341,7 +341,7 @@ def user_list(request):
 @view_config(route_name='user_add', renderer='bson')
 def user_add(request):
     new_fan = request.POST.get('fan', None)
-    if new_fan is None or request.db.webcan_users.find_one({'username': new_fan}) is not None:
+    if not new_fan or request.db.webcan_users.find_one({'username': new_fan}) is not None:
         return {
             'err': 'Empty or existing usernames cannot be used again'
         }
@@ -373,4 +373,5 @@ def check_credentials(username, password, ldap_server, ldap_suffix):
     try:
         return connection.bind()
     except:
+        print("LDAP Error: ", connection.result)
         return False

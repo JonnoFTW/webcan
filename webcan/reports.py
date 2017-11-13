@@ -38,7 +38,7 @@ def phase_classify_render(request):
         'timestamp': {'$exists': True, '$ne': None},
         'pos': {'$ne': None}
     }
-    print(request.POST)
+    # print(request.POST)
     min_phase_time = int(request.POST.get('min-phase-seconds'))
     if request.POST.getall('trips[]'):
         query['trip_id'] = {'$in': request.POST.getall('trips[]')}
@@ -122,16 +122,17 @@ def _classify_readings_with_phases_pas(readings, min_phase_time):
     speed = 'PID_SPEED (km/h)'
     tesla_speed_pid = 'PID_TESLA_REAR_DRIVE_UNIT_TORQUE_STATUS (vehicleSpeed km/h)'
     fms_cc_speed = 'FMS_CRUISE_CONTROL_VEHICLE_SPEED (km/h)'
+    fms_tac = 'FMS_TACOGRAPH (km/h)'
     _readings = []
     for i in readings:
         if speed not in i:
             # set the PID_SPEED km/h from the data we have
-            if tesla_speed_pid in i:
+            if tesla_speed_pid in i and i[tesla_speed_pid] is not None:
                 speed = tesla_speed_pid
-            elif fms_cc_speed in i and i[fms_cc_speed] < 200:
-                speed = 'FMS_CRUISE_CONTROL_VEHICLE_SPEED (km/h)'
-            elif 'FMS_TACOGRAPH (km/h)' in i:
-                speed = 'FMS_TACOGRAPH (km/h)'
+            elif fms_cc_speed in i and i[fms_cc_speed] is not None and i[fms_cc_speed] < 200:
+                speed = fms_cc_speed
+            elif fms_tac  in i and i[fms_tac] is not None and i[fms_tac] < 200:
+                speed = fms_tac
             else:
                 speed = 'spd_over_grnd'
 
@@ -141,6 +142,7 @@ def _classify_readings_with_phases_pas(readings, min_phase_time):
 
     readings[:] = _readings
     speed = 'speed'
+
     def check_next_5(start, up=1, s=1):
         try:
             return all([readings[start][speed] <= readings[start + up * 1][speed],
@@ -154,7 +156,7 @@ def _classify_readings_with_phases_pas(readings, min_phase_time):
     def idle_pass():
         # do Idle pass
         for i in readings:
-            if i[speed] <= 1:
+            if abs(i[speed]) <= 1:
                 i[phase] = 0
             else:
                 i[phase] = 6
@@ -201,11 +203,16 @@ def _classify_readings_with_phases_pas(readings, min_phase_time):
 
             idx = len(readings) - idx - 1
             prev = readings[idx]
-            if not decc_start and i[speed] > 0 and prev[speed] < 1:
-                decc_start = True
+            if not decc_start and i[speed] > 0 and prev[phase] == 0:
+                decc_start = idx
+                if prev[speed] <= 2:
+                    use_phase = 3
+                else:
+                    use_phase = 5
                 continue
             if decc_start:
-                i[phase] = 3
+                i[phase] = use_phase
+
                 # check if we've reached peak decel
                 if all([
                     i[speed] >= readings[idx - 2][speed],
@@ -216,8 +223,8 @@ def _classify_readings_with_phases_pas(readings, min_phase_time):
                 ]):  # readings[idx +1][speed] <= i[speed]:
                     decc_start = False
                     # mark the previous 5 as 0
-                    # for r in range(idx, idx + 5):
-                    #     readings[r][phase] = 0
+                    for r in range(idx, decc_start):
+                        readings[r][phase] = use_phase
 
     def avgSpeed(l):
         s = 0
@@ -230,16 +237,11 @@ def _classify_readings_with_phases_pas(readings, min_phase_time):
         stack = []
         for idx, i in enumerate(readings):
 
-            if i[phase] == 0 and readings[idx - 1][phase] > 1:
-                cruise_start = idx
-                stack.append(readings[idx - 1])
-            if cruise_start:
+            if i[speed] > 3:
+                stack = readings[idx:idx+6]
                 avg = avgSpeed(stack)
-                if avg - 5 < i[speed] < avg + 5:
+                if all(map(lambda x:abs(i[speed] - x[speed]) < 2, stack)):
                     i[phase] = 2
-                    stack.append(i)
-                else:
-                    cruise_start = False
 
     def accel_decel():
 
@@ -301,24 +303,35 @@ def _classify_readings_with_phases_pas(readings, min_phase_time):
     #     j = 1
     #     duration_limit = 4
     #     for i in range()
-
-
-    def cruise():
-        duration_limit = 4
-
-        # for i in readings:
-        #     if i[phase] == 6:
-        #         pass
-        c_start = None
+    def cleanup():
         for idx, i in enumerate(readings):
-            if i[phase] == 0 and i[speed] > 5:
-                i[phase] = 2
+            try:
+                prev = readings[idx-1]
+                post = readings[idx+1]
+                # if prev[phase] == post[phase]:
+                #     i[phase] = prev[phase]
+                # if i[phase] == 0 and i[speed] > 3:
+                #     i[phase] = prev[phase]
+            except IndexError:
+                pass
+
+    # def cruise():
+    #     duration_limit = 4
+    #
+    #     # for i in readings:
+    #     #     if i[phase] == 6:
+    #     #         pass
+    #     c_start = None
+    #     for idx, i in enumerate(readings):
+    #         if i[phase] == 0 and i[speed] > 5:
+    #             i[phase] = 2
 
     idle_pass()
     accel_from_stop()
     decel_to_stop()
-    accel_decel()
-    cruise()
+    # accel_decel()
+    # cruise()
+    # cleanup()
     return speed
 
 
