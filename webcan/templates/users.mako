@@ -6,7 +6,17 @@
                 <div class="card-header">
                     Manage Users
                     <form class="form-inline" id="new-user">
-                        <input class="form-control col-md-2 mr-sm-2" name="fan" id="fan-input" placeholder="fan"/>
+                        <input class="form-control col-md-2 mr-sm-2" name="new-fan" id="fan-input"
+                               placeholder="Username/FAN"/>
+                        <select class="form-control  mb-2 mr-sm-2 mb-sm-0" name="new-login">
+                            %for ft in ('ldap', 'external'):
+                                <option value="${ft}">${ft}</option>
+                            %endfor
+                        </select>
+                        <select class="form-control mb-2 mr-sm-2 mb-sm-0" name="new-level">
+                            <option value="admin">Admin</option>
+                            <option value="viewer">Viewer</option>
+                        </select>
                         <button type="button" id="submit" class="btn btn-primary">Add</button>
                     </form>
                 </div>
@@ -26,11 +36,26 @@
 
                             <tr>
                                 <td>${i[fields[0]]}</td>
-                                %for ft in ('login','level'):
-                                    <td>
-                                        ${i[ft]}
-                                    </td>
-                                %endfor
+                                <td>
+                                    <select name="${i[fields[0]]}-login" style="width:100%;">
+                                        %for ft in ('ldap', 'external'):
+                                        <%
+                                            selected = ''
+                                            if ft == i['login']: selected = 'selected'
+                                        %>
+                                            <option ${selected} value="${ft}">${ft}</option>
+                                        %endfor
+                                    </select>
+                                    %if i['login'] == 'external':
+                                        <button class="btn btn-primary">Reset Pass</button>
+                                    %endif
+                                </td>
+                                <td>
+                                    <select name="${i['username']}-level" style="width:100%;">
+                                        <option value="admin">Admin</option>
+                                        <option value="viewer">Viewer</option>
+                                    </select>
+                                </td>
                                 <td>
                                     <select style="width: 100%" multiple name="${i[fields[0]]}-devices">
                                         <%
@@ -55,7 +80,10 @@
 </div>
 <script type="text/javascript">
     $(document).ready(function () {
-        $('select').select2();
+        $('select').select2({
+            width: 'resolve',
+            dropdownAutoWidth: true
+        });
 
         $('#new-user').submit(function (ev) {
             ev.preventDefault();

@@ -24,7 +24,7 @@ def main(global_config, **settings):
         settings['ldap_server'] = os.getenv('LDAP_SERVER')
         settings['ldap_suffix'] = os.getenv('LDAP_USERNAME_SUFFIX')
 
-    config.add_static_view('static', 'static', cache_max_age=3600)
+    config.add_static_view('static', 'webcan:static', cache_max_age=3600)
     config.add_route('home', '/')
     config.add_route('login', '/login')
     config.add_route('logout', '/logout')

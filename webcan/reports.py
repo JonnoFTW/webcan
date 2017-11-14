@@ -139,7 +139,7 @@ def _classify_readings_with_phases_pas(readings, min_phase_time):
 
         if i[speed] is not None:
             i['speed'] = i[speed]
-            i['idx'] = idx
+            i['idx'] = "{} - {}".format(idx, speed.split(' ')[0][4:16])
             idx += 1
             _readings.append(i)
 
@@ -229,21 +229,16 @@ def _classify_readings_with_phases_pas(readings, min_phase_time):
                     for r in range(idx, decc_start):
                         readings[r][phase] = use_phase
 
-    def avgSpeed(l):
-        s = 0
-        for i in l:
-            s += i[speed]
-        return s / len(l)
+    def avgStdSpeed(l):
+        speeds = pluck(l, speed)
+        return np.mean(speeds), np.std(speeds)
 
     def cruise():
-        cruise_start = None
-        stack = []
         for idx, i in enumerate(readings):
-
             if i[speed] > 3:
-                stack = readings[idx:idx+6]
-                avg = avgSpeed(stack)
-                if all(map(lambda x:abs(i[speed] - x[speed]) < 2, stack)):
+                stack = readings[idx:idx+5]
+                avg, std = avgStdSpeed(stack)
+                if all(map(lambda x: abs(x[speed] - avg) < 1, stack)):
                     i[phase] = 2
 
     def accel_decel():
@@ -333,7 +328,7 @@ def _classify_readings_with_phases_pas(readings, min_phase_time):
     accel_from_stop()
     decel_to_stop()
     # accel_decel()
-    # cruise()
+    cruise()
     # cleanup()
     return speed
 
