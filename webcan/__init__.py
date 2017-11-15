@@ -17,11 +17,13 @@ def main(global_config, **settings):
     config = Configurator(settings=settings)
     config.include('pyramid_mako')
     import os
-
-    db_url = urlparse(os.getenv("WEBCAN_MONGO_URI"))
-    settings['ldap_server'] = os.getenv('LDAP_SERVER')
-    settings['ldap_suffix'] = os.getenv('LDAP_USERNAME_SUFFIX')
-    settings['auth_ticket_key'] = os.getenv('AUTH_TICKET_KEY')
+    if 'mongo_uri' in settings:
+        db_url = urlparse(settings['mongo_uri'])
+    else:
+        db_url = urlparse(os.getenv("WEBCAN_MONGO_URI"))
+        settings['ldap_server'] = os.getenv('LDAP_SERVER')
+        settings['ldap_suffix'] = os.getenv('LDAP_USERNAME_SUFFIX')
+        settings['auth_ticket_key'] = os.getenv('AUTH_TICKET_KEY')
 
     config.add_static_view('static', 'webcan:static', cache_max_age=3600)
     config.add_route('home', '/')
