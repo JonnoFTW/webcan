@@ -14,8 +14,7 @@ except ImportError:
 def main(global_config, **settings):
     """ This function returns a Pyramid WSGI application.
     """
-    config = Configurator(settings=settings)
-    config.include('pyramid_mako')
+
     import os
     if 'mongo_uri' in settings:
         db_url = urlparse(settings['mongo_uri'])
@@ -25,6 +24,8 @@ def main(global_config, **settings):
         settings['ldap_suffix'] = os.getenv('LDAP_USERNAME_SUFFIX')
         settings['auth_ticket_key'] = os.getenv('AUTH_TICKET_KEY')
 
+    config = Configurator(settings=settings)
+    config.include('pyramid_mako')
     config.add_static_view('static', 'webcan:static', cache_max_age=3600)
     config.add_route('home', '/')
     config.add_route('login', '/login')
