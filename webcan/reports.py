@@ -132,7 +132,7 @@ def _classify_readings_with_phases_pas(readings, min_phase_time):
                 speed = tesla_speed_pid
             elif fms_cc_speed in i and i[fms_cc_speed] is not None and i[fms_cc_speed] < 200:
                 speed = fms_cc_speed
-            elif fms_tac  in i and i[fms_tac] is not None and i[fms_tac] < 200:
+            elif fms_tac in i and i[fms_tac] is not None and i[fms_tac] < 200:
                 speed = fms_tac
             else:
                 speed = 'spd_over_grnd'

@@ -360,7 +360,7 @@ def user_add(request):
 
 
 def check_pass(password, hashed):
-    return bcrypt.checkpw(password, hashed)
+    return bcrypt.checkpw(password.encode('utf-8'), hashed.encode('utf-8'))
     # return hashlib.sha512(password.encode()).hexdigest()
 
 
