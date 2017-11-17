@@ -52,8 +52,16 @@
                                 </td>
                                 <td>
                                     <select name="${i['username']}-level" style="width:100%;">
-                                        <option value="admin">Admin</option>
-                                        <option value="viewer">Viewer</option>
+
+                                        %for v in ('admin', 'viewer'):
+
+                                            <option value="${v}"
+                                                %if i['level'] == v:
+                                                    selected
+                                                %endif
+                                            >${v.title()}</option>
+                                        %endfor
+
                                     </select>
                                 </td>
                                 <td>
@@ -101,7 +109,7 @@
 
                     $('#fan-input').val('')
                 },
-                headers: { Accept: "application/json; charset=utf-8"}
+                headers: {Accept: "application/json; charset=utf-8"}
 
             }).fail(function (data, text, err) {
                 console.log(data);
