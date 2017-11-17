@@ -52,6 +52,7 @@ def main(global_config, **settings):
     config.add_route('api_upload', '/api/upload')
     config.add_route('fix_pos', '/fix_pos')
 
+
     def add_db(request):
         conn = MongoClient(db_url.geturl(),
                            serverSelectionTimeoutMS=2500,

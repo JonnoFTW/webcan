@@ -35,7 +35,7 @@
                         %for i in users:
 
                             <tr>
-                                <td>${i[fields[0]]}</td>
+                                <td><a href="/users/v/${i[fields[0]]}">${i[fields[0]]}</a></td>
                                 <td>
                                     <select name="${i[fields[0]]}-login" style="width:100%;">
                                         %for ft in ('ldap', 'external'):

@@ -1,7 +1,7 @@
 from pyramid.events import BeforeRender, subscriber, BeforeTraversal
 from pyramid.security import remember, forget, Authenticated, Allow
 from pyramid.renderers import render_to_response, get_renderer
-from pyramid.view import view_config, notfound_view_config
+from pyramid.view import view_config, notfound_view_config, forbidden_view_config
 from ldap3 import Server, Connection, ALL, NTLM
 import pyramid.httpexceptions as exc
 from datetime import datetime
@@ -10,6 +10,7 @@ import platform
 import secrets
 import bcrypt
 import os
+import re
 
 import pymongo
 
@@ -48,11 +49,14 @@ def check_logged_in(event):
         return
     if not req.user:
         if req.is_xhr:
-            raise exc.HTTPBadRequest("You need to be logged in")
+            raise exc.HTTPForbidden("You need to be logged in")
         else:
             raise exc.HTTPFound('/login')
     else:
         req.user['devices'] = sorted(_get_user_devices(req), key=lambda x: x['name'].lower(), reverse=True)
+        if req.user['level'] == 'viewer':
+            if req.path in ('/fix_pos', '/users/add', '/users', '/users/'):
+                raise exc.HTTPForbidden("You don't have permission to do that")
 
 
 @subscriber(BeforeRender)
@@ -136,6 +140,8 @@ def fix_pos(request):
 )
 """
     return {'data': data}
+
+
 @view_config(route_name='trip_csv', renderer='csv')
 def trip_csv(request):
     trip_id = request.matchdict.get('trip_id')
@@ -238,9 +244,11 @@ def data_export_out(request):
         request=request,
         response=request.response
     )
-
-
-@notfound_view_config(renderer='templates/404.mako')
+@forbidden_view_config(renderer='templates/exceptions/403.mako')
+def forbidden(request):
+    request.response.status = 403
+    return {}
+@notfound_view_config(renderer='templates/exceptions/404.mako')
 def notfound(request):
     request.response.status = 404
     return {}
@@ -293,16 +301,18 @@ def login(request):
 
 @view_config(route_name='device_add', renderer='json')
 def add_device(request):
+    for f in ('dev_name', 'dev_make', 'dev_model', 'dev_type'):
+        if re.match(r"[^_ A-Za-z0-9.]", request.POST[f]):
+            return exc.HTTPBadRequest("Device fields must must only contain letters, numbers and underscores")
     try:
         doc = {
-            'name': request.POST['dev_name'],
+            'name': request.POST['dev_name'][:32],
             'secret': secrets.token_hex(32),
-            'make': request.POST['dev_make'],
-            'model': request.POST['dev_model'],
-            'type': request.POST['dev_type']
+            'make': request.POST['dev_make'][:32],
+            'model': request.POST['dev_model'][:32],
+            'type': request.POST['dev_type'][:32]
         }
-        dev = request.db.webcan_devices.insert_one(doc)
-
+        request.db.webcan_devices.insert_one(doc)
     except Exception as e:
         return exc.HTTPBadRequest('Please provide all fields and a unique name')
     del doc['_id']
@@ -342,21 +352,38 @@ def user_list(request):
 
 @view_config(route_name='user_add', renderer='bson')
 def user_add(request):
-    new_fan = request.POST.get('fan', None)
+    new_fan = request.POST.get('new-fan', None)
+    level = request.PSOT['new-level']
+    login_type = request.POST['new-login']
+    if re.match(r"[^_A-Za-z0-9.]", new_fan):
+        raise exc.HTTPBadRequest("Username must only contain underscores, letters and numbers")
+    if level not in ('admin', 'viewers'):
+        raise exc.HTTPBadRequest("User level must be admin or viewers")
+    if login_type not in ('ldap', 'external'):
+        raise exc.HTTPBadRequest("Login type must be ldap or external")
     if not new_fan or request.db.webcan_users.find_one({'username': new_fan}) is not None:
         return {
             'err': 'Empty or existing usernames cannot be used again'
         }
     new_user_obj = {
         'username': new_fan,
-        'login': 'ldap',
+        'login': login_type,
         'devices': [],
         'secret': secrets.token_hex(32),
-        'level': 'viewer'
+        'level': level
     }
 
     request.db.webcan_users.insert_one(new_user_obj)
     return new_user_obj
+
+
+@view_config(route_name='user_manage', renderer='bson')
+def user_manage(request):
+    user_id = request.matchdict['user_id']
+    if request.user['level'] != 'admin' and user_id != request.user['username']:
+        raise exc.HTTPForbidden("You can only view your own user page")
+    else:
+        return request.db.webcan_users.find_one({'username': user_id})
 
 
 def check_pass(password, hashed):
