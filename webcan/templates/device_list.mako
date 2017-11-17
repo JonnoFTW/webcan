@@ -69,10 +69,13 @@
 
         });
         $('#submit').click(function () {
-            $.post('/dev_add', $('#new-device').serialize())
-                    .done(function (data, status, jqxhr) {
-                        console.log(data);
-                    }).fail(function (jqxhr, status, err) {
+            $.post({
+                url: '/dev_add',
+                data: $('#new-device').serialize(),
+                headers: {Accept: "application/json; charset=utf-8"}
+            }).done(function (data, status, jqxhr) {
+                console.log(data);
+            }).fail(function (jqxhr, status, err) {
                 console.log(jqxhr, status, err);
             })
         });
