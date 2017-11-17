@@ -91,24 +91,27 @@
         });
         $('#submit').click(function () {
             $('.alert').alert('close');
-            $.post('/users/add',
-                    {fan: $('#fan-input').val()},
-                    function (data) {
-                        // return the new user object or null and add to the table
-                        var user = data.user;
-                        if (data.err) {
-                            console.log(data.err);
-                            $('#new-user').append(
-                                    '<div class="alert alert-danger" role="alert">\n' +
-                                    '  <strong>Error</strong> {}.\n'.format(data.err) +
-                                    '</div>');
-                            $('.alert').alert();
-                        } else {
-                            $('#tbody').append('<tr><td>{}</td><td>{}</td><td></td></tr>'.format(user.username, user.login));
-                        }
-                        $('#fan-input').val('');
-                    });
-        });
-    });
+            $.post({
+                url: '/users/add',
+                data: $('#new-user').serialize(),
+                success: function (data) {
+                    // return the new user object or null and add to the table
 
+                    $('#tbody').append('<tr><td>{}</td><td>{}</td><td></td><td></td><td></td></tr>'.format(data.username, data.login));
+
+                    $('#fan-input').val('')
+                },
+                headers: { Accept: "application/json; charset=utf-8"}
+
+            }).fail(function (data, text, err) {
+                console.log(data);
+                $('#new-user').append(
+                        '<div class="alert alert-danger" role="alert">\n' +
+                        '  <strong>Error</strong> {}.\n'.format(data.responseJSON.message) +
+                        '</div>');
+                $('.alert').alert();
+
+            });
+        })
+    });
 </script>

@@ -1,7 +1,7 @@
 from pyramid.events import BeforeRender, subscriber, BeforeTraversal
 from pyramid.security import remember, forget, Authenticated, Allow
 from pyramid.renderers import render_to_response, get_renderer
-from pyramid.view import view_config, notfound_view_config, forbidden_view_config
+from pyramid.view import view_config, notfound_view_config, forbidden_view_config, exception_view_config
 from ldap3 import Server, Connection, ALL, NTLM
 import pyramid.httpexceptions as exc
 from datetime import datetime
@@ -85,7 +85,7 @@ def show_device(request):
 @view_config(route_name='trip_json', renderer='bson')
 def trip_json(request):
     trip_id = request.matchdict.get('trip_id', None)
-    readings_query = {'trip_id': trip_id,'pos': {'$ne': None}}
+    readings_query = {'trip_id': trip_id, 'pos': {'$ne': None}}
     readings = list(
         request.db['rpi_readings'].find(readings_query, {'_id': False, 'vid': False, 'trip_id': False}).sort(
             [('trip_sequence', pymongo.ASCENDING)]))
@@ -123,7 +123,7 @@ def _prep_csv(query, header, rows):
 @view_config(route_name='fix_pos', renderer='bson')
 def fix_pos(request):
     # request all those data with latitude and longitude set without pos
-    query = {'pos': {'$exists': False}, 'latitude': {'$ne':0.0}}
+    query = {'pos': {'$exists': False}, 'latitude': {'$ne': 0.0}}
     data = list(request.db.rpi_readings.find(query))
     # do this:
     """
@@ -150,7 +150,7 @@ def trip_csv(request):
     # iterate through the data, make a set of headers seen
     header = set()
     rows = {}
-    query = request.db.rpi_readings.find({'trip_id': trip_id,'pos': {'$ne': None}}, {'_id': False}).sort(
+    query = request.db.rpi_readings.find({'trip_id': trip_id, 'pos': {'$ne': None}}, {'_id': False}).sort(
         [('trip_sequence', pymongo.ASCENDING)])
     vid = _prep_csv(query, header, rows)
     filename = '{}_{}.csv'.format(vid.replace(' ', '_'), trip_id)
@@ -162,7 +162,7 @@ def trip_csv(request):
     headers = to_front + sorted(header)
     return {
         'header': headers,
-        'rows': sorted(rows.values(),key=lambda x:x['trip_sequence']),
+        'rows': sorted(rows.values(), key=lambda x: x['trip_sequence']),
     }
 
 
@@ -244,14 +244,25 @@ def data_export_out(request):
         request=request,
         response=request.response
     )
+
+
 @forbidden_view_config(renderer='templates/exceptions/403.mako')
 def forbidden(request):
     request.response.status = 403
     return {}
+
+
 @notfound_view_config(renderer='templates/exceptions/404.mako')
 def notfound(request):
     request.response.status = 404
     return {}
+
+
+@view_config(context=exc.HTTPBadRequest)
+def bad_request(exception, request):
+    if request.is_xhr:
+        exception.content_type = 'application/json'
+    return exception
 
 
 @view_config(route_name='login', renderer='templates/login.mako')
@@ -275,9 +286,9 @@ def login(request):
             if user is not None:
                 if user.get('login', None) == 'ldap':
                     is_valid, err = check_credentials(username,
-                                                 password,
-                                                 request.registry.settings['ldap_server'],
-                                                 request.registry.settings['ldap_suffix'])
+                                                      password,
+                                                      request.registry.settings['ldap_server'],
+                                                      request.registry.settings['ldap_suffix'])
                     if err is not None:
                         message = err
                 else:  # if user['login'] == 'external':
@@ -302,7 +313,7 @@ def login(request):
 @view_config(route_name='device_add', renderer='json')
 def add_device(request):
     for f in ('dev_name', 'dev_make', 'dev_model', 'dev_type'):
-        if re.match(r"[^_ A-Za-z0-9.]", request.POST[f]):
+        if re.findall(r"^[\w_]+$",  request.POST[f]) is not None:
             return exc.HTTPBadRequest("Device fields must must only contain letters, numbers and underscores")
     try:
         doc = {
@@ -350,21 +361,31 @@ def user_list(request):
     }
 
 
+class AJAXHttpBadRequest(exc.HTTPBadRequest):
+    def doJson(self, status, body, title, environ):
+        return {'message': self.detail,
+                'code': status,
+                'title': self.title}
+
+    def __init__(self, detail):
+        exc.HTTPBadRequest.__init__(self, detail, json_formatter=self.doJson)
+
+        self.content_type = 'application/json'
+
+
 @view_config(route_name='user_add', renderer='bson')
 def user_add(request):
-    new_fan = request.POST.get('new-fan', None)
-    level = request.PSOT['new-level']
+    new_fan = request.POST['new-fan']
+    level = request.POST['new-level']
     login_type = request.POST['new-login']
-    if re.match(r"[^_A-Za-z0-9.]", new_fan):
-        raise exc.HTTPBadRequest("Username must only contain underscores, letters and numbers")
+    if new_fan and re.findall(r"^[\w_]+$", new_fan) is not None:
+        return AJAXHttpBadRequest("Username must only contain underscores, letters and numbers")
     if level not in ('admin', 'viewers'):
-        raise exc.HTTPBadRequest("User level must be admin or viewers")
+        return AJAXHttpBadRequest("User level must be admin or viewers")
     if login_type not in ('ldap', 'external'):
-        raise exc.HTTPBadRequest("Login type must be ldap or external")
+        return AJAXHttpBadRequest("Login type must be ldap or external", )
     if not new_fan or request.db.webcan_users.find_one({'username': new_fan}) is not None:
-        return {
-            'err': 'Empty or existing usernames cannot be used again'
-        }
+        return AJAXHttpBadRequest('Empty or existing usernames cannot be used again')
     new_user_obj = {
         'username': new_fan,
         'login': login_type,
@@ -404,4 +425,4 @@ def check_credentials(username, password, ldap_server, ldap_suffix):
     except Exception as e:
 
         print("LDAP Error: ", connection.result, e)
-        return False, "LDAP Error: "+str(e)
+        return False, "LDAP Error: " + str(e)
