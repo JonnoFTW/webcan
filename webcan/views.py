@@ -1,26 +1,20 @@
-from pyramid.events import BeforeRender, subscriber, BeforeTraversal
-from pyramid.security import remember, forget, Authenticated, Allow
+from pyramid.view import view_config, notfound_view_config, forbidden_view_config
 from pyramid.renderers import render_to_response, get_renderer
-from pyramid.view import view_config, notfound_view_config, forbidden_view_config, exception_view_config
-from ldap3 import Server, Connection, ALL, NTLM
-import pyramid.httpexceptions as exc
+from pyramid.events import BeforeRender, subscriber
 from datetime import datetime
+import pyramid.httpexceptions as exc
 from pluck import pluck
 import platform
-import secrets
-import bcrypt
-import os
-import re
-
 import pymongo
+import os
 
 LOGIN_TYPES = ['ldap', 'external']
 USER_LEVELS = ['admin', 'viewer']
 
 
-@view_config(route_name='home', renderer="templates/mytemplate.mako")
+@view_config(route_name='home', renderer="templates/home.mako")
 def home_view(request):
-    return {'project': 'webcan'}
+    return {}
 
 
 @view_config(route_name='devices', renderer='templates/device_list.mako')
@@ -37,26 +31,7 @@ def _get_user_devices(request):
         query = {}
     else:
         query = {'name': {'$in': user['devices']}}
-    return list(request.db['webcan_devices'].find(query))
-
-
-@subscriber(BeforeTraversal)
-def check_logged_in(event):
-    # if the user is not logged in and tries to access anything but /login,
-    # redirect to /loging or send ajax error about not being logged in
-    req = event.request
-    if req.path in ('/login', '/logout', '/api/upload'):
-        return
-    if not req.user:
-        if req.is_xhr:
-            raise exc.HTTPForbidden("You need to be logged in")
-        else:
-            raise exc.HTTPFound('/login')
-    else:
-        req.user['devices'] = sorted(_get_user_devices(req), key=lambda x: x['name'].lower(), reverse=True)
-        if req.user['level'] == 'viewer':
-            if req.path in ('/fix_pos', '/users/add', '/users', '/users/'):
-                raise exc.HTTPForbidden("You don't have permission to do that")
+    return list(request.db['webcan_devices'].find(query, {'_id': 0}))
 
 
 @subscriber(BeforeRender)
@@ -66,20 +41,6 @@ def add_device_global(event):
         event['_host'] = platform.node()
         if event['request'].user is not None:
             event['devices'] = event['request'].user['devices']
-
-
-@view_config(route_name='device', renderer='templates/device.mako')
-def show_device(request):
-    device_id = request.matchdict['device_id']
-
-    return {
-        'device': device_id,
-        'trips': sorted(request.db['rpi_readings'].distinct('trip_id',
-                                                            {'vid': device_id,
-                                                             'pos': {'$ne': None}}
-                                                            ),
-                        reverse=True)
-    }
 
 
 @view_config(route_name='trip_json', renderer='bson')
@@ -265,102 +226,6 @@ def bad_request(exception, request):
     return exception
 
 
-@view_config(route_name='login', renderer='templates/login.mako')
-def login(request):
-    login_url = request.resource_url(request.context, 'login')
-    referrer = request.url
-    if referrer == login_url:
-        referrer = '/'  # never use the login form itself as came_from
-    came_from = request.params.get('came_from', referrer)
-    # if post data is set, try to login,
-    message_def = 'Please provide a valid username and password'
-    username = ''
-    password = ''
-
-    if 'form.submitted' in request.params:
-        message = message_def
-        username = request.POST.get('username', None)
-        password = request.POST.get('password', None)
-        if not (username is None or password is None):
-            user = request.db['webcan_users'].find_one({'username': username})
-            if user is not None:
-                if user.get('login', None) == 'ldap':
-                    is_valid, err = check_credentials(username,
-                                                      password,
-                                                      request.registry.settings['ldap_server'],
-                                                      request.registry.settings['ldap_suffix'])
-                    if err is not None:
-                        message = err
-                else:  # if user['login'] == 'external':
-                    is_valid = check_pass(password, user['password'])
-                if is_valid:
-                    # actually log the user in and take them to the front page!
-                    headers = remember(request, user['username'])
-                    return exc.HTTPFound(location=came_from, headers=headers)
-
-    else:
-        message = ''
-
-    return dict(
-        message=message,
-        url=request.application_url + '/login',
-        came_from=came_from,
-        username=username,
-        password=password,
-    )
-
-
-@view_config(route_name='device_add', renderer='json')
-def add_device(request):
-    for f in ('dev_name', 'dev_make', 'dev_model', 'dev_type'):
-        if re.findall(r"^[\w_]+$",  request.POST[f]) is not None:
-            return exc.HTTPBadRequest("Device fields must must only contain letters, numbers and underscores")
-    try:
-        doc = {
-            'name': request.POST['dev_name'][:32],
-            'secret': secrets.token_hex(32),
-            'make': request.POST['dev_make'][:32],
-            'model': request.POST['dev_model'][:32],
-            'type': request.POST['dev_type'][:32]
-        }
-        request.db.webcan_devices.insert_one(doc)
-    except Exception as e:
-        return exc.HTTPBadRequest('Please provide all fields and a unique name')
-    del doc['_id']
-    return doc
-
-
-@view_config(route_name='trips_of_device', renderer='bson')
-def trips_of_device(request):
-    req_devices = set(request.GET.getall('devices[]'))
-    user_devices = set(pluck(request.user['devices'], 'name'))
-    if len(req_devices) == 0:
-        devices = user_devices
-    else:
-        devices = req_devices & user_devices
-    trips = list(request.db.rpi_readings.distinct('trip_id', {'vid': {'$in': list(devices)}}))
-    trips_with_vid = [request.db.rpi_readings.find_one({'trip_id': x, 'vid': {'$exists': True}},
-                                                       {'_id': False, 'trip_id': True, 'vid': True}) for x in trips]
-    return {
-        'trips': trips_with_vid
-    }
-
-
-@view_config(route_name='logout')
-def logout(request):
-    headers = forget(request)
-    return exc.HTTPFound(location='/login', headers=headers)
-
-
-@view_config(route_name='user_list', renderer='templates/users.mako')
-def user_list(request):
-    return {
-        'users': request.db.webcan_users.find({}),
-        'user_levels': USER_LEVELS,
-        'login_types': LOGIN_TYPES
-    }
-
-
 class AJAXHttpBadRequest(exc.HTTPBadRequest):
     def doJson(self, status, body, title, environ):
         return {'message': self.detail,
@@ -371,58 +236,3 @@ class AJAXHttpBadRequest(exc.HTTPBadRequest):
         exc.HTTPBadRequest.__init__(self, detail, json_formatter=self.doJson)
 
         self.content_type = 'application/json'
-
-
-@view_config(route_name='user_add', renderer='bson')
-def user_add(request):
-    new_fan = request.POST['new-fan']
-    level = request.POST['new-level']
-    login_type = request.POST['new-login']
-    if new_fan and re.findall(r"^[\w_]+$", new_fan) is not None:
-        return AJAXHttpBadRequest("Username must only contain underscores, letters and numbers")
-    if level not in ('admin', 'viewers'):
-        return AJAXHttpBadRequest("User level must be admin or viewers")
-    if login_type not in ('ldap', 'external'):
-        return AJAXHttpBadRequest("Login type must be ldap or external", )
-    if not new_fan or request.db.webcan_users.find_one({'username': new_fan}) is not None:
-        return AJAXHttpBadRequest('Empty or existing usernames cannot be used again')
-    new_user_obj = {
-        'username': new_fan,
-        'login': login_type,
-        'devices': [],
-        'secret': secrets.token_hex(32),
-        'level': level
-    }
-
-    request.db.webcan_users.insert_one(new_user_obj)
-    return new_user_obj
-
-
-@view_config(route_name='user_manage', renderer='bson')
-def user_manage(request):
-    user_id = request.matchdict['user_id']
-    if request.user['level'] != 'admin' and user_id != request.user['username']:
-        raise exc.HTTPForbidden("You can only view your own user page")
-    else:
-        return request.db.webcan_users.find_one({'username': user_id})
-
-
-def check_pass(password, hashed):
-    return bcrypt.checkpw(password.encode('utf-8'), hashed.encode('utf-8'))
-    # return hashlib.sha512(password.encode()).hexdigest()
-
-
-def check_credentials(username, password, ldap_server, ldap_suffix):
-    """Verifies credentials for username and password.
-    Returns True on success or False on failure
-    """
-    ldap_user = '\\{}@{}'.format(username, ldap_suffix)
-    server = Server(ldap_server, use_ssl=True)
-
-    connection = Connection(server, user=ldap_user, password=password, authentication=NTLM, receive_timeout=5)
-    try:
-        return connection.bind(), None
-    except Exception as e:
-
-        print("LDAP Error: ", connection.result, e)
-        return False, "LDAP Error: " + str(e)

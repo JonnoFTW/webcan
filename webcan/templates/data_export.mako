@@ -7,7 +7,7 @@
                 <div class="card-header">
                     <i class="fa fa-info fa-fw"></i> Export
                 </div>
-                <div class="card-block">
+                <div class="card-body">
                     <form action="/export" method="post" id="export-form" class="form-horizontal">
                         <fieldset>
                             <!-- Form Name -->

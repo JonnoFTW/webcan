@@ -6,7 +6,7 @@
                 <div class="card-header ">
                     <h3>403: Permission Denied</h3>
                 </div>
-                <div class="card-block">
+                <div class="card-body">
                     You don't have access to: ${req.path}
                 </div>
             </div>

@@ -8,7 +8,7 @@
                     Generate Phase Classification Report
                 </div>
 
-                <div class="card-block">
+                <div class="card-body">
                     <div class="row">
                         <div class="col-6">
                             <!-- Selections -->
@@ -150,7 +150,7 @@
                         } else if(stat_type === "Vehicles") {
                             islink = "<a href=\"/dev/{0}\">{0}</a>".format(stat_title);
                         }
-                        var row = "<th scope=\"row\">{}</th>".format(islink);
+                        var row = "<th scope=\"row\" class=\"col-md-3\">{}</th>".format(islink);
                         heads = _.keys(stat_obj);
                         _.forEach(stat_obj, function (stat_value, stat_name) {
                             row += "<td>{0}</td>".format(stat_value);
@@ -166,7 +166,7 @@
                             "<div class=\"col-12\" id=\"{0}-stats\">\n" +
                             "    <h3>{0} Statistics</h3>\n" +
                             "    <table class=\"table table-bordered table-striped\">\n" +
-                            "        <thead class=\"thead-inverse\">\n" +
+                            "        <thead class=\"thead-dark\">\n" +
                             "        <tr>{2}</tr>\n" +
                             "        </thead>\n" +
                             "        <tbody id=\"{0}-table\">{1}</tbody>\n" +
