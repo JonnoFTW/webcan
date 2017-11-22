@@ -5,6 +5,10 @@ import secrets
 import re
 
 
+@view_config(route_name='devices', renderer='templates/device_list.mako')
+def list_devices(request):
+    return {}
+
 @view_config(route_name='device_add', renderer='json')
 def add_device(request):
     for f in ('dev_name', 'dev_make', 'dev_model', 'dev_type'):

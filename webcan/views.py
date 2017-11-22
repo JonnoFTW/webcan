@@ -17,11 +17,6 @@ def home_view(request):
     return {}
 
 
-@view_config(route_name='devices', renderer='templates/device_list.mako')
-def list_devices(request):
-    return {}
-
-
 def _get_user_devices(request):
     if request.authenticated_userid is None:
         return []
