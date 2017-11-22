@@ -1,11 +1,11 @@
-import bcrypt
 from pyramid.events import subscriber, BeforeTraversal
+from ldap3 import Server, Connection, ALL, NTLM
+from pyramid.security import remember, forget
+from datetime import datetime, timedelta
 from pyramid.view import view_config
 import pyramid.httpexceptions as exc
-from pyramid.security import remember, forget
-from ldap3 import Server, Connection, ALL, NTLM
-from datetime import datetime, timedelta
 from .views import _get_user_devices
+import bcrypt
 
 
 @subscriber(BeforeTraversal)
@@ -13,7 +13,7 @@ def check_logged_in(event):
     # if the user is not logged in and tries to access anything but /login,
     # redirect to /loging or send ajax error about not being logged in
     req = event.request
-    if req.path in ('/login', '/logout', '/api/upload'):
+    if req.path in ('/login', '/logout', '/api/upload', '/reset_password'):
         return
     if not req.user:
         if req.is_xhr:
@@ -27,7 +27,7 @@ def check_logged_in(event):
                 raise exc.HTTPForbidden("You don't have permission to do that")
 
 
-@view_config(route_name='login', renderer='templates/login.mako')
+@view_config(route_name='login', renderer='templates/simple/login.mako')
 def login(request):
     login_url = request.resource_url(request.context, 'login')
     referrer = request.url
