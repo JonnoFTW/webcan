@@ -8,17 +8,17 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="description" content="application to show CAN logs">
     <meta name="author" content="Jonathan Mackenzie">
-    <link rel="icon" href="/static/favicon.ico">
+    <link rel="icon" href="${request.static_url('webcan:static/favicon.ico')}">
 
     <title>WebCAN Viewer</title>
 
     <!-- Bootstrap core CSS -->
     <link rel="stylesheet" href="//cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css"/>
-    <link href="https://maxcdn.bootstrapcdn.com/bootstrap/4.0.0-alpha.6/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://maxcdn.bootstrapcdn.com/bootstrap/4.0.0-beta.2/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="//cdnjs.cloudflare.com/ajax/libs/tether/1.4.0/css/tether.min.css"/>
     <script src="//cdnjs.cloudflare.com/ajax/libs/jquery/3.2.1/jquery.min.js"></script>
     <!-- Custom styles for this scaffold -->
-    <link href="/static/theme.css" rel="stylesheet">
+    <link href="${request.static_url('webcan:static/theme.css')}" rel="stylesheet">
     <link rel="stylesheet" href="//cdnjs.cloudflare.com/ajax/libs/select2/4.0.3/css/select2.min.css"/>
     <script src="//cdnjs.cloudflare.com/ajax/libs/moment.js/2.18.1/moment.min.js"></script>
     <link rel="stylesheet"
@@ -38,10 +38,10 @@
 </head>
 
 <body>
-<nav class="navbar navbar-toggleable-md fixed-top navbar-inverse bg-inverse">
+<nav class="navbar navbar-expand-md fixed-top navbar-dark bg-dark">
     <div class="container">
         <button class="navbar-toggler navbar-toggler-right" type="button" data-toggle="collapse"
-                data-target="#navbarsExampleDefault" aria-controls="navbarsExampleDefault" aria-expanded="false"
+                data-target="#navbar" aria-controls="navbar" aria-expanded="false"
                 aria-label="Toggle navigation">
             <span class="navbar-toggler-icon"></span>
         </button>
@@ -51,7 +51,7 @@
             WebCAN Viewer
         </a>
 
-        <div class="collapse navbar-collapse">
+        <div class="collapse navbar-collapse" id="navbar">
             <ul class="navbar-nav mr-auto">
                 <li class="nav-item dropdown">
                     <a class="nav-link dropdown-toggle" href="/dev" id="dropdown01" data-toggle="dropdown"
@@ -71,11 +71,11 @@
 
             </ul>
             <ul class="nav navbar-nav navbar-right">
-                <li class="nav-item disabled"><a class="nav-link disabled" href="#">${_host}</a></li>
                 %if request.authenticated_userid:
-                %if request.user['level'] == 'admin':
-                    <li class="nav-item"><a class="nav-link" href="/users">Users</a></li>
-                %endif
+                    %if request.user['level'] == 'admin':
+                        <li class="nav-item disabled"><a class="nav-link disabled" href="#">${_host}</a></li>
+                        <li class="nav-item"><a class="nav-link" href="/users">Users</a></li>
+                    %endif
                     <li class="nav-item"><a class="nav-link" href="/logout">Logout</a></li>
                 %endif
 
@@ -96,10 +96,9 @@
 <!-- Bootstrap core JavaScript
 ================================================== -->
 <!-- Placed at the end of the document so the pages load faster -->
-
-<script src="//cdnjs.cloudflare.com/ajax/libs/tether/1.4.0/js/tether.min.js"></script>
+<script src="//cdnjs.cloudflare.com/ajax/libs/popper.js/1.13.0/umd/popper.min.js"></script>
 <script src="//cdnjs.cloudflare.com/ajax/libs/select2/4.0.3/js/select2.full.min.js"></script>
-<script src="//maxcdn.bootstrapcdn.com/bootstrap/4.0.0-alpha.6/js/bootstrap.min.js"></script>
+<script src="//maxcdn.bootstrapcdn.com/bootstrap/4.0.0-beta.2/js/bootstrap.min.js"></script>
 <script src="//maps.googleapis.com/maps/api/js?key=AIzaSyDPLn4txz_v6bq0ayC_TgzELsgKYmVEwmU"></script>
 <script src="//cdnjs.cloudflare.com/ajax/libs/gmaps.js/0.4.25/gmaps.min.js"></script>
 <script src="//cdnjs.cloudflare.com/ajax/libs/lodash.js/4.17.4/lodash.min.js"></script>

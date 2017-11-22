@@ -42,7 +42,7 @@ def upload_vehicle(request):
             if js['trip_id'] not in timestamps:
                 try:
                     timestamps[js['trip_id']] = js['timestamp'].astimezone(tz_local).strftime("%Y%m%d_%H%M%S_{}".format('_'.join(js['trip_id'].split('_')[2:])))
-                    print("Changing {} to {}".format(js['trip_id'], timestamps[js['trip_id']]))
+                    # print("Changing {} to {}".format(js['trip_id'], timestamps[js['trip_id']]))
                 except:
                     pass
         else:

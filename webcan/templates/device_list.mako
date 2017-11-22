@@ -40,7 +40,7 @@
                                         <!-- Trigger -->
                                         <span class="input-group-btn">
                                             <button class="btn btn-sm btn-primary btn-clipboard"
-                                                    data-clipboard-target="#key-${i[fields[0]]}">
+                                                   data-val="${i[fields[1]]}">
                                                 <i class="fa fa-clipboard fa-1" aria-hidden="true"></i>
                                             </button>
                                         </span>
@@ -79,7 +79,11 @@
                 console.log(jqxhr, status, err);
             })
         });
-        var clipboard = new Clipboard('.btn-clipboard');
+        var clipboard = new Clipboard('.btn-clipboard', {
+            text: function(trigger) {
+                return $(trigger).data('val');
+            }
+        });
         $('.btn-clipboard').tooltip({
             trigger: 'click',
             placement: 'top'

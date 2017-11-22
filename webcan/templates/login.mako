@@ -11,9 +11,10 @@
 
     <title>WebCAN Viewer - Login</title>
     <!-- Bootstrap core CSS -->
-    <link href="//netdna.bootstrapcdn.com/bootstrap/3.1.1/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://maxcdn.bootstrapcdn.com/bootstrap/4.0.0-beta.2/css/bootstrap.min.css" rel="stylesheet">
     <script src="//cdnjs.cloudflare.com/ajax/libs/jquery/3.2.1/jquery.min.js"></script>
-    <script type='text/javascript' src="//netdna.bootstrapcdn.com/bootstrap/3.1.1/js/bootstrap.min.js"></script>
+    <script src="//cdnjs.cloudflare.com/ajax/libs/popper.js/1.13.0/umd/popper.min.js"></script>
+    <script src="//maxcdn.bootstrapcdn.com/bootstrap/4.0.0-beta.2/js/bootstrap.min.js"></script>
 
     <!-- Custom styles for this template -->
     <style type="text/css">
@@ -91,7 +92,7 @@
             </label>
         </div>
         %if message:
-                <div  id="submit-message" class="alert alert-danger" role="alert">${message}</div>
+            <div id="submit-message" class="alert alert-danger" role="alert">${message}</div>
         %endif
 
         <button class="btn btn-lg btn-primary btn-block" name="form.submitted" type="submit">Sign in</button>

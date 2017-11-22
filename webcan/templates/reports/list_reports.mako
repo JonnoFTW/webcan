@@ -7,7 +7,7 @@
                     Reports
                 </div>
 
-                <div class="card-block">
+                <div class="card-body">
                     <div class="row">
                         <ul>
                             %for r in reports:

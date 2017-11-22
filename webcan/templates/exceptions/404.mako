@@ -6,7 +6,7 @@
                 <div class="card-header ">
                     <h3>404: Page Not Found</h3>
                 </div>
-                <div class="card-block">
+                <div class="card-body">
                     Page not found on this server: ${req.path}
                 </div>
             </div>
