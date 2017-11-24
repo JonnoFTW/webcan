@@ -12,7 +12,7 @@ def list_devices(request):
 @view_config(route_name='device_add', renderer='json')
 def add_device(request):
     for f in ('dev_name', 'dev_make', 'dev_model', 'dev_type'):
-        if re.findall(r"^[\w_]+$", request.POST[f]) is not None:
+        if re.findall(r"^[\w_]+$", request.POST[f]) == []:
             return exc.HTTPBadRequest("Device fields must must only contain letters, numbers and underscores")
     try:
         doc = {

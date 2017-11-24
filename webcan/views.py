@@ -26,7 +26,7 @@ def _get_user_devices(request):
         query = {}
     else:
         query = {'name': {'$in': user['devices']}}
-    return list(request.db['webcan_devices'].find(query, {'_id': 0}))
+    return list(request.db['webcan_devices'].find(query, {'_id': 0}).sort([('name', pymongo.ASCENDING)]))
 
 
 @subscriber(BeforeRender)

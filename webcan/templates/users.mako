@@ -22,9 +22,9 @@
                     <tbody id="tbody">
                     <tr v-for="user in users">
                         <td><a :href="'/users/v/'+user.username">{{user.username}}</a><br>
-                            <button v-if="user.login == 'external'" class="btn btn-danger btn-sm reset-password">Reset
-                                Pass
-                            </button>
+                            <button v-if="user.login == 'external'"
+                                    @click="reset_pass(user.username)"
+                                    class="btn btn-danger btn-sm reset-password">Reset Pass</button>
                         </td>
                         <td>
                             <v-select :name="user.username+'-login'" v-model="user.login" :options="login"></v-select>
@@ -47,6 +47,7 @@
 %>
 <script src="https://unpkg.com/vue"></script>
 <script src="https://unpkg.com/vue-select@latest"></script>
+<script src="https://unpkg.com/vue-resource@1.3.4/dist/vue-resource.min.js"></script>
 <script type="text/javascript">
     Vue.component('v-select', VueSelect.VueSelect);
     var app = new Vue({
@@ -69,7 +70,14 @@
                 return str.charAt(0).toUpperCase() + str.slice(1)
             }
         },
-        methods: {}
+        methods: {
+            reset_pass: function(username) {
+                var route = '/users/reset/'+username;
+                this.$http.get(route).then(function(response) {
+                    console.log(response);
+                });
+            }
+        }
     });
     $(document).ready(function () {
 

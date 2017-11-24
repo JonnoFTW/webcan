@@ -24,6 +24,8 @@ def main(global_config, **settings):
         settings['ldap_server'] = os.getenv('LDAP_SERVER')
         settings['ldap_suffix'] = os.getenv('LDAP_USERNAME_SUFFIX')
         settings['auth_ticket_key'] = os.getenv('AUTH_TICKET_KEY')
+        settings['smtp_domain'] = os.getenv('SMTP_DOMAIN')
+        settings['smtp_from'] = os.getenv('SMTP_FROM')
 
     config = Configurator(settings=settings)
     config.include('pyramid_mako')
@@ -92,4 +94,6 @@ def main(global_config, **settings):
     config.add_renderer('shp', 'webcan.renderers.ShapefileRenderer')
 
     config.scan()
-    return config.make_wsgi_app()
+    app = config.make_wsgi_app()
+    from paste.translogger import TransLogger
+    return TransLogger(app, setup_console_handler=False)
