@@ -3,10 +3,12 @@ from email.message import EmailMessage
 import pyramid.httpexceptions as exc
 from pyramid.view import view_config
 from smtplib import SMTP
+import logging
 import secrets
 import bcrypt
 import re
 
+log = logging.getLogger(__name__)
 
 @view_config(route_name='user_list', renderer='templates/users.mako')
 def user_list(request):
@@ -74,10 +76,10 @@ def set_password_reset(request):
             msg = EmailMessage()
             msg.set_content("Please reset your webcan password using this link: "+reset_url)
             msg['Subject'] = "Webcan Password Reset"
-            msg['From'] = user+'@'+domain
+            msg['From'] = user
             msg['To'] = user_obj['email']
             smtp.send_message(msg)
-            print("Reset password for: {}".format(user_obj['username']))
+            log.info("Reset password for: {}".format(user_obj['username']))
     return {
         'url': reset_url
     }
