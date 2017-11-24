@@ -19,14 +19,15 @@ def user_list(request):
 
 @view_config(route_name='user_add', renderer='bson')
 def user_add(request):
-    new_fan = request.POST.get('new-fan')
-    level = request.POST.get('new-level')
-    login_type = request.POST.get('new-login')
+    print(request.params)
+    new_fan = request.POST.get('name')
+    level = request.POST.get('level')
+    login_type = request.POST.get('login')
     if new_fan is None or re.findall(r"^[\w_]+$", new_fan) == []:
         return AJAXHttpBadRequest("Username must only contain underscores, letters and numbers")
-    if level not in ('admin', 'viewers'):
+    if level not in USER_LEVELS:
         return AJAXHttpBadRequest("User level must be admin or viewers")
-    if login_type not in ('ldap', 'external'):
+    if login_type not in LOGIN_TYPES:
         return AJAXHttpBadRequest("Login type must be ldap or external", )
     if not new_fan or request.db.webcan_users.find_one({'username': new_fan}) is not None:
         return AJAXHttpBadRequest('Empty or existing usernames cannot be used again')
