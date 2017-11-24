@@ -35,6 +35,7 @@
                         </td>
                         <td>
                             <v-select :name="user.username+'-login'" v-model="user.login" :options="login"></v-select>
+                            <input class="form-control" v-if="user.login == 'external'" v-model="user.email" placeholder="Email"/>
                         </td>
                         <td>
                             <v-select :name="user.username+'-level'" v-model="user.level" :options="levels"></v-select>
