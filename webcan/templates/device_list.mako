@@ -25,7 +25,7 @@
                     </tr>
                     </thead>
                     <tbody>
-                        %for i in devices:
+                        %for i in sorted(devices, key=lambda x:x['name'].lower()):
 
                             <tr>
                                 <td><a href="/dev/${i[fields[0]]}">${i[fields[0]]}</a></td>

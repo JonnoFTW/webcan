@@ -6,10 +6,11 @@ waitress
 pymongo
 pyshp
 bcrypt
-ldap
+ldap3
 pluck
 numpy
 pytz
 scipy
 geopy
+Paste
 #git+https://github.com/Supervisor/supervisor.git

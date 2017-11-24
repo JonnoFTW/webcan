@@ -1,6 +1,8 @@
 from .views import USER_LEVELS, LOGIN_TYPES, AJAXHttpBadRequest
+from email.message import EmailMessage
 import pyramid.httpexceptions as exc
 from pyramid.view import view_config
+from smtplib import SMTP
 import secrets
 import bcrypt
 import re
@@ -55,12 +57,28 @@ def user_manage(request):
 
 @view_config(route_name='reset_user_password', renderer='bson')
 def set_password_reset(request):
-    url = secrets.token_urlsafe(16)
+    reset_key = secrets.token_urlsafe(16)
     username = request.matchdict['user_id']
+    user_obj = request.db.webcan_users.find_one({'username': username})
+    if user_obj is None:
+        return exc.HTTPBadRequest("No such user")
     request.db.webcan_users.update_one({'username': username},
-                                       {'$set': {'reset_password': url}})
+                                       {'$set': {'reset_password': reset_key}})
+    reset_url = '{}/reset_password?reset_key={}'.format(request.application_url, reset_key)
+    # send an email to the user with the link
+    if 'email' in user_obj:
+        domain = request.registry.settings['smtp_domain']
+        user = request.registry.settings['smtp_from']
+        with SMTP(domain) as smtp:
+            msg = EmailMessage()
+            msg.set_content("Please reset your webcan password using this link: "+reset_url)
+            msg['Subject'] = "Webcan Password Reset"
+            msg['From'] = user+'@'+domain
+            msg['To'] = user_obj['email']
+            smtp.send_message(msg)
+            print("Reset password for: {}".format(user_obj['username']))
     return {
-        'url': '{}/reset_password?reset_key={}'.format(request.application_url, url)
+        'url': reset_url
     }
 
 
