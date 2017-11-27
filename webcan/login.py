@@ -6,6 +6,7 @@ from pyramid.view import view_config
 import pyramid.httpexceptions as exc
 from .views import _get_user_devices
 import bcrypt
+import os
 
 
 @subscriber(BeforeTraversal)
@@ -13,6 +14,7 @@ def check_logged_in(event):
     # if the user is not logged in and tries to access anything but /login,
     # redirect to /loging or send ajax error about not being logged in
     req = event.request
+    req.environ['REMOTE_USER'] = req.authenticated_userid
     if req.path in ('/login', '/logout', '/api/upload', '/reset_password'):
         return
     if not req.user:

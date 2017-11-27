@@ -90,8 +90,14 @@
                 this.loading = false;
             });
             this.devices = ${json.dumps(devices)|n};
-            this.devices.unshift({'name': 'ALL DEVICES'});
+            var allDev = {'name': 'ALL DEVICES', 'value': '*'};
+            this.devices.unshift(allDev);
             this.users = ${json.dumps(users)|n};
+            this.users.forEach(function(el) {
+                if(el.devices == '*') {
+                    el.devices = [allDev];
+                }
+            });
 
         },
         filters: {
