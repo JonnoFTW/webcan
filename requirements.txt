@@ -12,5 +12,4 @@ numpy
 pytz
 scipy
 geopy
-Paste
 #git+https://github.com/Supervisor/supervisor.git

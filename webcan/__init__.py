@@ -95,5 +95,5 @@ def main(global_config, **settings):
 
     config.scan()
     app = config.make_wsgi_app()
-    from paste.translogger import TransLogger
-    return TransLogger(app, setup_console_handler=False)
+    from .utils.apache_logger import RequestIdMiddleware
+    return RequestIdMiddleware(app)
