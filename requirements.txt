@@ -12,4 +12,5 @@ numpy
 pytz
 scipy
 geopy
+request-id
 #git+https://github.com/Supervisor/supervisor.git
