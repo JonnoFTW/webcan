@@ -1,4 +1,4 @@
-from bson import json_util
+from bson import json_util, int64
 import json
 import csv
 import shapefile
@@ -108,6 +108,7 @@ class ShapefileRenderer(BaseRenderer):
             str: ('C', 30),
             date: ('D',),
             time: ('T',),
+            int64.Int64: ('N',)
         }
         for h, t in headers.items():
             writer.field(h, *header_map[t])

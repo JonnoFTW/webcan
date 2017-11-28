@@ -95,5 +95,4 @@ def main(global_config, **settings):
 
     config.scan()
     app = config.make_wsgi_app()
-    from .utils.apache_logger import RequestIdMiddleware
-    return RequestIdMiddleware(app)
+    return app

@@ -96,11 +96,13 @@
     var load_trip = function (trip_id) {
         console.log("Loading trip:", trip_id)
         window.location.hash = '#{}'.format(trip_id);
-        $('#csv-link').html('<i class="fa fa-spinner fa-pulse fa-fw"></i>\n' +
-                '<span class="sr-only">Loading...</span>');
         if (!trip_id) {
+            $('#csv-link').html('No Data for this vehicle');
             return;
         }
+        $('#csv-link').html('<i class="fa fa-spinner fa-pulse fa-fw"></i>\n' +
+                '<span class="sr-only">Loading...</span>');
+
         $.getJSON("/trip/{}.json".format(trip_id), function (readings) {
             if (readings.readings.length === 0) {
                 $('#csv-link').html('No data!');

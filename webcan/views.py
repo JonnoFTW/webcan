@@ -114,7 +114,8 @@ def trip_csv(request):
     # put GPS fields first
     to_front = ['trip_sequence', 'timestamp', 'latitude', 'longitude', 'altitude', 'spd_over_grnd', 'num_sats']
     for i in to_front:
-        header.remove(i)
+        if i in header:
+            header.remove(i)
     headers = to_front + sorted(header)
     return {
         'header': headers,
