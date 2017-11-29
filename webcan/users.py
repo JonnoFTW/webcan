@@ -13,7 +13,7 @@ log = logging.getLogger(__name__)
 @view_config(route_name='user_list', renderer='templates/users.mako')
 def user_list(request):
     return {
-        'users': list(request.db.webcan_users.find({}, {'_id': 0, 'password': 0, 'secret': 0})),
+        'users': list(request.db.webcan_users.find({}, {'_id': 0, 'password': 0, 'secret': 0, 'reset_password': 0})),
         'user_levels': USER_LEVELS,
         'login_types': LOGIN_TYPES
     }

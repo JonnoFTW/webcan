@@ -37,7 +37,8 @@
         data.addColumn('datetime', 'Time');
         var vaxes = {};
         var series = {};
-        var fields_using = $('#select-y').val();
+        var $sely = $('#select-y');
+        var fields_using = $sely.val();
         _.forEach(fields_using, function (v, idx) {
             data.addColumn('number', v);
 
@@ -59,7 +60,7 @@
             });
         });
         // set all the fields in
-        $('#select-y').select2({
+        $sely.select2({
             data: _.keys(fields)
         });
         var title = _.join(fields_using, ', ');
@@ -94,24 +95,25 @@
     };
     var mReadings = null;
     var load_trip = function (trip_id) {
-        console.log("Loading trip:", trip_id)
+        console.log("Loading trip:", trip_id);
         window.location.hash = '#{}'.format(trip_id);
+        var $csvlink = $('#csv-link');
         if (!trip_id) {
             $('#csv-link').html('No Data for this vehicle');
             return;
         }
-        $('#csv-link').html('<i class="fa fa-spinner fa-pulse fa-fw"></i>\n' +
+        $csvlink.html('<i class="fa fa-spinner fa-pulse fa-fw"></i>\n' +
                 '<span class="sr-only">Loading...</span>');
 
         $.getJSON("/trip/{}.json".format(trip_id), function (readings) {
             if (readings.readings.length === 0) {
-                $('#csv-link').html('No data!');
+                $csvlink.html('No data!');
                 return;
             }
             map.removeMarkers();
             readings.readings = show_path(readings.readings);
 
-            $('#csv-link').html('<a class="btn btn-sm btn-outline-primary" href="/trip/{}.csv">Get {}.csv</a>'.format(trip_id, trip_id));
+            $csvlink.html('<a class="btn btn-sm btn-outline-primary" href="/trip/{}.csv">Get {}.csv</a>'.format(trip_id, trip_id));
             if (readings.readings.length > 0)
                 map.setCenter(readings.readings[0].lat, readings.readings[0].lng);
             mReadings = readings.readings;
@@ -127,7 +129,7 @@
                     lng: lng,
                     zoom: 16
                 });
-                $sel = $('#select-trip');
+                var $sel = $('#select-trip');
                 $sel.select2({
                     width: '340px'
                 }).on('select2:select', function (evt) {
