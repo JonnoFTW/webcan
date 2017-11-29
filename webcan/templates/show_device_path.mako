@@ -4,7 +4,7 @@
 
     function componentToHex(c) {
         var hex = c.toString(16);
-        return hex.length == 1 ? "0" + hex : hex;
+        return hex.length === 1 ? "0" + hex : hex;
     }
 
     function rgbToHex(r, g, b) {
@@ -52,7 +52,7 @@
     };
     var generateIcon = function (reading) {
         var canvas = document.createElement('canvas');
-        var label = String(reading.trip_sequence)
+        var label = String(reading.trip_sequence);
         var width = 30;
         var height = 30;
         canvas.width = width;
@@ -118,7 +118,7 @@
             } else {
                 return;
             }
-            if(reading.lat == 0 && reading.lng == 0) {
+            if(reading.lat === 0 && reading.lng === 0) {
                 return;
             }
             out.push(reading);

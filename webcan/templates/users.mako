@@ -1,11 +1,12 @@
 <%inherit file="layout.mako"/>
+<!--suppress ALL -->
 <div class="content">
     <div class="row">
         <div class="col-md-12">
             <div class="card" id="app">
                 <div v-if="loading" class="col-12 text-center" style="padding: 15px" id="loader">
-                        <i class="fa fa-spinner fa-pulse fa-5x fa-fw"></i>
-                        <span class="sr-only">Loading...</span>
+                    <i class="fa fa-spinner fa-pulse fa-5x fa-fw"></i>
+                    <span class="sr-only">Loading...</span>
                 </div>
                 <div id="content" style="display:none">
 
@@ -33,28 +34,7 @@
                         </tr>
                         </thead>
                         <tbody id="tbody">
-                        <tr v-for="user in users">
-                            <td><a :href="'/users/v/'+user.username">{{user.username}}</a><br>
-                                <button v-if="user.login == 'external'"
-                                        @click="reset_pass(user.username)"
-                                        class="btn btn-danger btn-sm reset-password">Reset Pass
-                                </button>
-                            </td>
-                            <td>
-                                <v-select :name="user.username+'-login'" v-model="user.login"
-                                          :options="login"></v-select>
-                                <input class="form-control" v-if="user.login == 'external'" v-model="user.email"
-                                       placeholder="Email"/>
-                            </td>
-                            <td>
-                                <v-select :name="user.username+'-level'" v-model="user.level"
-                                          :options="levels"></v-select>
-                            </td>
-                            <td>
-                                <v-select style="width: 100%" :options="devices" label="name" v-model="user.devices"
-                                          multiple :name="user.username+'-devices'"></v-select>
-                            </td>
-                        </tr>
+                        <tr is="user-component" :user="user" v-for="user in users" :key="user.username"></tr>
                         </tbody>
                     </table>
                 </div>
@@ -70,6 +50,57 @@
 <script src="https://unpkg.com/vue-resource@1.3.4/dist/vue-resource.min.js"></script>
 <script type="text/javascript">
     Vue.component('v-select', VueSelect.VueSelect);
+    Vue.component('user-component',
+            {
+                data: function () {
+                    return {
+                        levels: app.levels,
+                        devices: app.devices,
+                        login: app.login
+                    }
+                },
+                props: ["user"],
+                template: `
+            <tr>
+                <td><a :href="'/users/v/'+user.username">{{user.username}}</a><br>
+                    <button v-if="user.login == 'external'"
+                            @click="reset_pass(user.username)"
+                            class="btn btn-danger btn-sm reset-password">Reset Pass
+                    </button>
+                </td>
+                <td>
+                    <v-select :name="user.username+'-login'" v-model="user.login" :placeholder="'Login'" :options="login"></v-select>
+                    <input class="form-control" v-if="user.login == 'external'" v-model="user.email"  placeholder="Email"/>
+                </td>
+                <td>
+                    <v-select :name="user.username+'-level'" v-model="user.level"
+                              :options="levels"></v-select>
+                </td>
+                <td>
+                    <v-select :options="devices" label="name" v-model="user.devices"
+                              multiple :name="user.username+'-devices'"></v-select>
+                </td>
+            </tr>`,
+                watch: {
+                    user: {
+                        handler: function (newValue, oldValue) {
+                            console.log(newValue.username + " modified")
+                            console.log("New",newValue);
+                            console.log("Old",oldValue);
+
+                        },
+                        deep: true
+                    }
+                },
+                methods: {
+                    reset_pass: function (username) {
+                        var route = '/users/reset/' + username;
+                        this.$http.get(route).then(function (response) {
+                            console.log(response);
+                        });
+                    },
+                }
+            });
     var app = new Vue({
         el: '#app',
         data: {
@@ -85,7 +116,7 @@
         },
 
         mounted: function () {
-            $('#loader').hide(500,function() {
+            $('#loader').hide(500, function () {
                 $('#content').show(500);
                 this.loading = false;
             });
@@ -93,8 +124,8 @@
             var allDev = {'name': 'ALL DEVICES', 'value': '*'};
             this.devices.unshift(allDev);
             this.users = ${json.dumps(users)|n};
-            this.users.forEach(function(el) {
-                if(el.devices == '*') {
+            this.users.forEach(function (el) {
+                if (el.devices === '*') {
                     el.devices = [allDev];
                 }
             });
@@ -106,12 +137,7 @@
             }
         },
         methods: {
-            reset_pass: function (username) {
-                var route = '/users/reset/' + username;
-                this.$http.get(route).then(function (response) {
-                    console.log(response);
-                });
-            },
+
             add_user: function (trigger) {
                 console.log("adding user");
                 this.$http.post('/users/add', this.newuser, {emulateJSON: true}).then(
@@ -126,9 +152,6 @@
                             this.newerrorvisible = true;
                         });
             },
-            update_user: function () {
-
-            }
         }
     });
 </script>

@@ -32,7 +32,7 @@
                             </div>
                              <div class="form-group col-12">
                                 <label for="min-phase-seconds" class="col-12 col-form-label">Minimum Phase Duration (seconds)</label>                <input type="number" name="min-phase-seconds" id="min-phase-seconds" value="5" class="form-control"/>
-                                </select>
+
 
                             </div>
                             <div class="form-group col-12" id="load-button">
@@ -65,7 +65,6 @@
             </div>
         </div>
     </div>
-</div>
 </div>
 <script type="text/javascript" src="https://www.gstatic.com/charts/loader.js"></script>
 <script type="application/javascript"
@@ -133,7 +132,7 @@
                 'hull': $('#map-hull').val(),
                 'min-phase-seconds': $('#min-phase-seconds').val()
             }, function (data) {
-                $stat_tables = $('#stat-tables');
+                var $stat_tables = $('#stat-tables');
                 $stat_tables.empty();
                 speed_field = data.speed_field;
                 _.forEach(data.summary, function (thing_stats, stat_type) {

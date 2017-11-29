@@ -35,6 +35,53 @@
     % if _pid is not undefined:
         <!-- PID: ${_pid} HOST: ${_host}-->
     % endif
+    <style type="text/css">
+        @import url(//fonts.googleapis.com/css?family=Open+Sans:300,400,600,700);
+
+        body {
+            font-family: "Open Sans", "Helvetica Neue", Helvetica, Arial, sans-serif;
+            padding-top: 70px;
+        }
+
+        h1,
+        h2,
+        h3,
+        h4,
+        h5,
+        h6 {
+            font-family: "Open Sans", "Helvetica Neue", Helvetica, Arial, sans-serif;
+            font-weight: 300;
+        }
+
+        p {
+            font-weight: 300;
+        }
+
+        .font-normal {
+            font-weight: 400;
+        }
+
+        .font-semi-bold {
+            font-weight: 600;
+        }
+
+        .font-bold {
+            font-weight: 700;
+        }
+
+        .v-select .dropdown-toggle {
+            display: flex !important;
+            flex-wrap: wrap;
+        }
+
+        .v-select input[type=search], .v-select input[type=search]:focus {
+            flex-basis: 20px;
+            flex-grow: 1;
+            height: 33px;
+            padding: 0 20px 0 10px;
+            width: 100% !important;
+        }
+    </style>
 </head>
 
 <body>
@@ -72,10 +119,10 @@
             </ul>
             <ul class="nav navbar-nav navbar-right">
                 %if request.authenticated_userid:
-                    %if request.user['level'] == 'admin':
-                        <li class="nav-item disabled"><a class="nav-link disabled" href="#">${_host}</a></li>
-                        <li class="nav-item"><a class="nav-link" href="/users">Users</a></li>
-                    %endif
+                %if request.user['level'] == 'admin':
+                    <li class="nav-item disabled"><a class="nav-link disabled" href="#">${_host}</a></li>
+                    <li class="nav-item"><a class="nav-link" href="/users">Users</a></li>
+                %endif
                     <li class="nav-item"><a class="nav-link" href="/logout">Logout</a></li>
                 %endif
 
