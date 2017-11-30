@@ -40,7 +40,8 @@ class BSONRenderer(BaseRenderer):
 
     def __call__(self, value, system):
         self._set_ct(system)
-        return json.dumps(value, default=json_util.default, indent=2)
+        # return json.dumps(value)
+        return json.dumps(value, default=json_util.default)
 
 
 class PyMongoCursorRenderer(BaseRenderer):
