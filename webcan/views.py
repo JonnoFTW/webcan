@@ -42,20 +42,20 @@ def add_device_global(event):
 def trip_json(request):
     trip_id = request.matchdict.get('trip_id', None)
     readings_query = {'trip_id': trip_id, 'pos': {'$ne': None}}
-    readings = list(
-        request.db['rpi_readings'].find(readings_query, {'_id': False, 'vid': False, 'trip_id': False}).sort(
+    readings = list(request.db['rpi_readings'].find(readings_query, {'_id': False, 'vid': False, 'trip_id': False}).sort(
             [('trip_sequence', pymongo.ASCENDING)]))
-    out = []
-    for r in readings:
-        if 'pos' not in r and 'latitude' in r:
-            r['pos'] = {
-                'type': 'Point',
-                'coordinates': [r['longitude'], r['latitude']]
-            }
-            del r['latitude']
-            del r['longitude']
-        out.append(r)
-    return {'readings': out}
+
+    # out = []
+    # for r in readings:
+    #     if 'pos' not in r and 'latitude' in r:
+    #         r['pos'] = {
+    #             'type': 'Point',
+    #             'coordinates': [r['longitude'], r['latitude']]
+    #         }
+    #         del r['latitude']
+    #         del r['longitude']
+    #     out.append(r)
+    return {'readings': readings}
 
 
 def _prep_csv(query, header, rows):

@@ -27,6 +27,8 @@
     </div>
 </div>
 <%include file="show_device_path.mako"/>
+<script type="text/javascript"
+        src="https://cdn.rawgit.com/englercj/jquery-ajax-progress/fd98e923/js/jquery.ajax-progress.js"></script>
 <script type="text/javascript" src="https://www.gstatic.com/charts/loader.js"></script>
 <script type="text/javascript">
     var map = null;
@@ -105,20 +107,40 @@
         $csvlink.html('<i class="fa fa-spinner fa-pulse fa-fw"></i>\n' +
                 '<span class="sr-only">Loading...</span>');
 
-        $.getJSON("/trip/{}.json".format(trip_id), function (readings) {
-            if (readings.readings.length === 0) {
-                $csvlink.html('No data!');
-                return;
-            }
-            map.removeMarkers();
-            readings.readings = show_path(readings.readings);
+        $.ajax({
+            type: 'GET',
+            dataType: 'json',
+            url: "/trip/{}.json".format(trip_id),
+            progress: function (e) {
+                //make sure we can compute the length
+                if (e.lengthComputable) {
+                    //calculate the percentage loaded
+                    var pct = (e.loaded / e.total) * 100;
 
-            $csvlink.html('<a class="btn btn-sm btn-outline-primary" href="/trip/{}.csv">Get {}.csv</a>'.format(trip_id, trip_id));
-            if (readings.readings.length > 0)
-                map.setCenter(readings.readings[0].lat, readings.readings[0].lng);
-            mReadings = readings.readings;
-            do_chart();
+                    //log percentage loaded
+                    console.log(pct);
+                }
+                //this usually happens when Content-Length isn't set
+                else {
+                    console.warn('Content Length not reported!');
+                }
+            },
+            success: function (readings) {
+                if (readings.readings.length === 0) {
+                    $csvlink.html('No data!');
+                    return;
+                }
+                map.removeMarkers();
+                readings.readings = show_path(readings.readings);
+
+                $csvlink.html('<a class="btn btn-sm btn-outline-primary" href="/trip/{}.csv">Get {}.csv</a>'.format(trip_id, trip_id));
+                if (readings.readings.length > 0)
+                    map.setCenter(readings.readings[0].lat, readings.readings[0].lng);
+                mReadings = readings.readings;
+                do_chart();
+            }
         });
+        ##                 $.getJSON("/trip/{}.json".format(trip_id), function (readings) {);
     };
     $(document).ready(function () {
         google.charts.load('current', {

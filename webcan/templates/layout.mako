@@ -18,7 +18,6 @@
     <link rel="stylesheet" href="//cdnjs.cloudflare.com/ajax/libs/tether/1.4.0/css/tether.min.css"/>
     <script src="//cdnjs.cloudflare.com/ajax/libs/jquery/3.2.1/jquery.min.js"></script>
     <!-- Custom styles for this scaffold -->
-    <link href="${request.static_url('webcan:static/theme.css')}" rel="stylesheet">
     <link rel="stylesheet" href="//cdnjs.cloudflare.com/ajax/libs/select2/4.0.3/css/select2.min.css"/>
     <script src="//cdnjs.cloudflare.com/ajax/libs/moment.js/2.18.1/moment.min.js"></script>
     <link rel="stylesheet"
