@@ -15,7 +15,7 @@
 
                             <input type="hidden" name="map-hull" id="map-hull"/>
                             <div class="form-group col-12">
-                                <label for="select-trips" class="col-2 col-form-label">Trips</label>
+                                <label for="select-trips" class="col-12 col-form-label">Trips</label>
                                 <select  style="width:500px" multiple id="select-trips">
                                     %for trip in reversed(trips):
                                         <option value="${trip}">${trip}</option>
@@ -23,7 +23,7 @@
                                 </select>
                             </div>
                             <div class="form-group col-12">
-                                <label for="select-vids" class="col-2 col-form-label">Vehicles</label>
+                                <label for="select-vids" class="col-12 col-form-label">Vehicles</label>
                                 <select style="width:500px" multiple id="select-vids">
                                     %for d in devices:
                                         <option value="${d['name']}">${d['name']}</option>
