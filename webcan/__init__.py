@@ -60,13 +60,16 @@ def main(global_config, **settings):
     def add_db(request):
         conn = MongoClient(db_url.geturl(),
                            serverSelectionTimeoutMS=2500,
-                           connectTimeoutMS=2500,
-                           socketTimeoutMS=2500)
+                           connectTimeoutMS=5000,
+                           socketTimeoutMS=5000,
+                           maxPoolSize=100,
+                           maxIdleTimeMs=30000,
+                           appname='webcan')
         db = conn[db_url.path[1:]]
 
         def conn_close(request):
             conn.close()
-
+        
         request.add_finished_callback(conn_close)
         return db
 
