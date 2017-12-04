@@ -126,8 +126,7 @@ def trip_csv(request):
 def get_device_trips_for_user(request):
     return list(
         request.db.rpi_readings.distinct('trip_id',
-                                         {'vid': {'$in': pluck(request.user['devices'], 'name')},
-                                          'timestamp': {'$ne': None}}))
+                                         {'vid': {'$in': pluck(request.user['devices'], 'name')}}))
 
 
 @view_config(route_name='data_export', request_method='GET', renderer='templates/data_export.mako')
