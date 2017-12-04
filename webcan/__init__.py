@@ -59,10 +59,10 @@ def main(global_config, **settings):
 
     def add_db(request):
         conn = MongoClient(db_url.geturl(),
-                           serverSelectionTimeoutMS=2500,
-                           connectTimeoutMS=5000,
-                           socketTimeoutMS=5000,
-                           maxPoolSize=100,
+                           serverSelectionTimeoutMS=10000,
+                           connectTimeoutMS=10000,
+                           socketTimeoutMS=10000,
+                           maxPoolSize=200,
                            maxIdleTimeMs=30000,
                            appname='webcan')
         db = conn[db_url.path[1:]]
