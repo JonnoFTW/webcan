@@ -105,7 +105,6 @@
     };
     var show_path = function (readings) {
         var last = null;
-        var markers = [];
         var out = [];
         _.forEach(readings, function (reading) {
             var tooltip = "<h5>Reading {}</h5>".format(reading.trip_sequence);
@@ -127,7 +126,8 @@
             }
             reading.timestamp = moment.unix(reading.timestamp['$date'] / 1000);
             if (last !== null) {
-                reading.time_diff = "{}s".format(reading.timestamp.diff(last.timestamp, 'seconds', true));
+                ##  reading.time_diff = "{}s".format(reading.timestamp.diff(last.timestamp, 'seconds', true));
+                reading.time_diff = reading.timestamp.diff(last.timestamp, 'seconds', true);
             }
             last = reading;
             delete reading.pos;

@@ -1,11 +1,13 @@
-from pyramid.view import view_config, notfound_view_config, forbidden_view_config
+from pyramid.view import view_config, notfound_view_config, forbidden_view_config, exception_view_config
 from pyramid.renderers import render_to_response, get_renderer
 from pyramid.events import BeforeRender, subscriber
-from datetime import datetime
 import pyramid.httpexceptions as exc
+from datetime import datetime
+from .utils import calc_extra
 from pluck import pluck
 import platform
 import pymongo
+import pymongo.errors
 import os
 
 LOGIN_TYPES = ['ldap', 'external']
@@ -36,26 +38,6 @@ def add_device_global(event):
         event['_host'] = platform.node()
         if event['request'].user is not None:
             event['devices'] = event['request'].user['devices']
-
-
-@view_config(route_name='trip_json', renderer='bson')
-def trip_json(request):
-    trip_id = request.matchdict.get('trip_id', None)
-    readings_query = {'trip_id': trip_id, 'pos': {'$ne': None}}
-    readings = list(request.db['rpi_readings'].find(readings_query, {'_id': False, 'vid': False, 'trip_id': False}).sort(
-            [('trip_sequence', pymongo.ASCENDING)]))
-
-    # out = []
-    # for r in readings:
-    #     if 'pos' not in r and 'latitude' in r:
-    #         r['pos'] = {
-    #             'type': 'Point',
-    #             'coordinates': [r['longitude'], r['latitude']]
-    #         }
-    #         del r['latitude']
-    #         del r['longitude']
-    #     out.append(r)
-    return {'readings': readings}
 
 
 def _prep_csv(query, header, rows):
@@ -212,6 +194,11 @@ def forbidden(request):
 def notfound(request):
     request.response.status = 404
     return {}
+
+
+@exception_view_config(pymongo.errors.NetworkTimeout, renderer='templates/exceptions/503.mako')
+def service_unavailable(request):
+    return {'msg'}
 
 
 @view_config(context=exc.HTTPBadRequest)

@@ -1,8 +1,10 @@
+import pymongo
 from pymongo import MongoClient
 from pyramid.config import Configurator
 from pyramid.security import unauthenticated_userid
 from pyramid.authentication import AuthTktAuthenticationPolicy
 from pyramid.authorization import ACLAuthorizationPolicy
+from pyramid.httpexceptions import HTTPServiceUnavailable
 
 try:
     # for python 2

@@ -41,7 +41,7 @@ class BSONRenderer(BaseRenderer):
     def __call__(self, value, system):
         self._set_ct(system)
         # return json.dumps(value)
-        return json.dumps(value, default=json_util.default)
+        return json_util.dumps(value, separators=(',', ':'))
 
 
 class PyMongoCursorRenderer(BaseRenderer):
@@ -52,7 +52,7 @@ class PyMongoCursorRenderer(BaseRenderer):
 
     def __call__(self, value, system):
         self._set_ct(system)
-        return '[' + (','.join([json.dumps(i, default=json_util.default) for i in value])) + ']'
+        return json_util.dumps(value, separators=(',', ':'))
 
 
 class CSVRenderer(BaseRenderer):
