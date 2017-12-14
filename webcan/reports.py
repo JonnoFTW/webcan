@@ -1,5 +1,5 @@
 from datetime import timedelta
-
+from .utils import calc_extra
 from .views import get_device_trips_for_user
 from pyramid.view import view_config
 from geopy.distance import vincenty, GreatCircleDistance
@@ -8,7 +8,6 @@ from pluck import pluck
 import numpy as np
 import pymongo
 from itertools import filterfalse
-
 
 phase = 'phase'
 trip_sequence = 'trip_sequence'
@@ -44,12 +43,16 @@ def phase_classify_render(request):
         query['trip_id'] = {'$in': request.POST.getall('trips[]')}
     if request.POST.getall('devices[]'):
         query['vid'] = {'$in': request.POST.getall('devices[]')}
-    readings = list(request.db.rpi_readings.find(query,
-                                                 {'_id': False}).sort([('timestamp', pymongo.ASCENDING)]))
+    cursor = request.db.rpi_readings.find(query,
+                                          {'_id': False}).sort([('timestamp', pymongo.ASCENDING)])
+
+    print("Len readings: {}", cursor.count())
+    readings = list(cursor)
     speed = _classify_readings_with_phases_pas(readings, min_phase_time)
     summary = _summarise_readings(readings)
     return {
         'readings': readings,
+        # 'readings': [],
         'summary': summary,
         'speed_field': speed
     }
@@ -80,8 +83,6 @@ def _summarise_readings(readings):
                 continue
             dist = 0
             duration = 0
-            energy = 0
-            co2 = 0
             phases = {"Phase {}".format(i): 0 for i in range(7)}
             # print(val)
             start = val[0]['timestamp']
@@ -96,14 +97,22 @@ def _summarise_readings(readings):
             duration += (val[-1]['timestamp'] - start).total_seconds()
             m, s = divmod(duration, 60)
             h, m = divmod(m, 60)
-
+            usages = [
+                'Total CO2 (g)',
+                'Petrol Used (ml)',
+                'Petrol CO2 (g)',
+                'Petrol cost (c)',
+                'E Used (kWh)',
+                'E CO2 (g)',
+                'E cost (c)',
+                'Total CO2 (g)'
+            ]
             out[key] = {
                 'Duration': "%d:%02d:%02d" % (h, m, s),
                 'Distance (km)': round(dist, 4),
-                'Energy (W)': energy,
-                'CO2': co2
-
             }
+            for field in usages:
+                out[key][field] = round(sum(pluck(val, field, default=0)), 2)
             out[key].update({k: "{} ({:.2f}%)".format(v, 100 * v / len(val)) for k, v in phases.items()})
         return out
 
@@ -125,6 +134,7 @@ def _classify_readings_with_phases_pas(readings, min_phase_time):
     fms_tac = 'FMS_TACOGRAPH (km/h)'
     _readings = []
     idx = 0
+    prev = None
     for i in readings:
         if speed not in i:
             # set the PID_SPEED km/h from the data we have
@@ -136,11 +146,12 @@ def _classify_readings_with_phases_pas(readings, min_phase_time):
                 speed = fms_tac
             else:
                 speed = 'spd_over_grnd'
-
         if i[speed] is not None:
             i['speed'] = i[speed]
             i['idx'] = "{} - {}".format(idx, speed.split(' ')[0][4:16])
             idx += 1
+            i.update(calc_extra(i, prev))
+            prev = i
             _readings.append(i)
 
     readings[:] = _readings
@@ -236,7 +247,7 @@ def _classify_readings_with_phases_pas(readings, min_phase_time):
     def cruise():
         for idx, i in enumerate(readings):
             if i[speed] > 3:
-                stack = readings[idx:idx+5]
+                stack = readings[idx:idx + 5]
                 avg, std = avgStdSpeed(stack)
                 if all(map(lambda x: abs(x[speed] - avg) < 1, stack)):
                     i[phase] = 2
@@ -295,6 +306,7 @@ def _classify_readings_with_phases_pas(readings, min_phase_time):
                             for j in range(tStart, tEnd):
                                 readings[j][phase] = 5
                 tStart = tEnd
+
     # def int_decel():
 
     # def cruise_error_filter():
@@ -304,8 +316,8 @@ def _classify_readings_with_phases_pas(readings, min_phase_time):
     def cleanup():
         for idx, i in enumerate(readings):
             try:
-                prev = readings[idx-1]
-                post = readings[idx+1]
+                prev = readings[idx - 1]
+                post = readings[idx + 1]
                 # if prev[phase] == post[phase]:
                 #     i[phase] = prev[phase]
                 # if i[phase] == 0 and i[speed] > 3:
@@ -325,10 +337,10 @@ def _classify_readings_with_phases_pas(readings, min_phase_time):
     #             i[phase] = 2
 
     idle_pass()
-    accel_from_stop()
-    decel_to_stop()
+    # accel_from_stop()
+    # decel_to_stop()
     # accel_decel()
-    cruise()
+    # cruise()
     # cleanup()
     return speed
 

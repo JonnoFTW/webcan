@@ -6,7 +6,6 @@ from pyramid.view import view_config
 import pyramid.httpexceptions as exc
 from .views import _get_user_devices
 import bcrypt
-import os
 
 
 @subscriber(BeforeTraversal)

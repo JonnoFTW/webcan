@@ -5,17 +5,32 @@
         <div class="col-md-12">
             <div class="card">
                 <div class="card-header">
-                    <i class="fa fa-info fa-fw"></i> Map
-                    <select class="form-control" id="select-trip">
-                        %for t in trips:
-                            <option value="${t}">${t}</option>
-                        %endfor
-                    </select>
-                    <div class="float-right" id="csv-link"></div>
+                    <form class="form-inline">
+                        <i class="fa fa-info fa-fw"></i> Map
+                        <div class="input-group mb-3 mr-sm-2 mb-sm-0">
+                            <select class="form-control" id="select-trip">
+                                %for t in trips:
+                                    <option value="${t}">${t}</option>
+                                %endfor
+                            </select>
+                        </div>
+                        <label for="time_diff">Time Diff </label>
+                        <input class="form-control col-1" placeholder="Diff" name="time_diff" value="1.0"
+                               id="time_diff"
+                               type="number"/>
+                        <div class="text-right float-right pull-right col" id="csv-link"></div>
+                    </form>
+
                 </div>
                 <div style="width:100%; height:800px" id="map"></div>
                 <div class="col-12">
+
                     <div class="box">
+                        <label for="select-x">X Axis</label>
+                        <select class="form-control" id="select-x">
+                            <option selected>datetime</option>
+                        </select>
+                        <label for="select-y">Y Axis</label>
                         <select class="form-control" multiple id="select-y">
                             <option selected>spd_over_grnd</option>
                         </select>
@@ -36,7 +51,15 @@
     var do_chart = function () {
         var readings = mReadings;
         var data = new google.visualization.DataTable();
-        data.addColumn('datetime', 'Time');
+        var $selx = $("#select-x");
+        var tsXaxis = true;
+        if ($selx.val() === "datetime") {
+            data.addColumn('datetime', 'Time');
+        } else {
+            tsXaxis = false;
+            data.addColumn('number', $selx.val())
+        }
+
         var vaxes = {};
         var series = {};
         var $sely = $('#select-y');
@@ -52,7 +75,12 @@
         });
         var fields = {};
         _.forEach(readings, function (v) {
-            var row = [new Date(v.timestamp)];
+
+            var row = [];
+            if (tsXaxis)
+                row.push(new Date(v.timestamp));
+            else
+                row.push(v[$selx.val()]);
             _.forEach(fields_using, function (f) {
                 row.push(v[f]);
             });
@@ -62,6 +90,9 @@
             });
         });
         // set all the fields in
+        $selx.select2({
+            data: _.keys(fields)
+        });
         $sely.select2({
             data: _.keys(fields)
         });
@@ -110,6 +141,7 @@
         $.ajax({
             type: 'GET',
             dataType: 'json',
+            data: {'time_diff': $('#time_diff').val()},
             url: "/trip/{}.json".format(trip_id),
             progress: function (e) {
                 //make sure we can compute the length
@@ -130,10 +162,10 @@
                     $csvlink.html('No data!');
                     return;
                 }
+                $csvlink.html('<a class="btn btn-sm btn-outline-primary" href="/trip/{}.csv">Get {}.csv</a>'.format(trip_id, trip_id));
                 map.removeMarkers();
                 readings.readings = show_path(readings.readings);
 
-                $csvlink.html('<a class="btn btn-sm btn-outline-primary" href="/trip/{}.csv">Get {}.csv</a>'.format(trip_id, trip_id));
                 if (readings.readings.length > 0)
                     map.setCenter(readings.readings[0].lat, readings.readings[0].lng);
                 mReadings = readings.readings;
@@ -157,7 +189,7 @@
                 }).on('select2:select', function (evt) {
                     load_trip($(this).val());
                 });
-                $('#select-y').select2().on('select2:select select2:unselect', function (evt) {
+                $('#select-y, #select-x').select2().on('select2:select select2:unselect', function (evt) {
                     do_chart();
                 });
                 $('.map-load').click(function () {
