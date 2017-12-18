@@ -13,7 +13,10 @@ def check_logged_in(event):
     # if the user is not logged in and tries to access anything but /login,
     # redirect to /loging or send ajax error about not being logged in
     req = event.request
-    req.environ['REMOTE_USER'] = req.authenticated_userid
+    try:
+        req.environ['REMOTE_USER'] = req.authenticated_userid
+    except:
+        pass
     if req.path in ('/login', '/logout', '/api/upload', '/reset_password'):
         return
     if not req.user:
