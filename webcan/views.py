@@ -33,6 +33,8 @@ def _get_user_devices(request):
 
 @subscriber(BeforeRender)
 def add_device_global(event):
+    if event['request'].exception:
+        return
     if event['renderer_info'].type == '.mako':
         event['_pid'] = os.getpid()
         event['_host'] = platform.node()
@@ -198,7 +200,14 @@ def notfound(request):
 
 @exception_view_config(pymongo.errors.NetworkTimeout, renderer='templates/exceptions/503.mako')
 def service_unavailable(request):
-    return {'msg'}
+    return {'msg': 'Server too busy or your query took too long'}
+
+@exception_view_config(pymongo.errors.ConnectionFailure, renderer='templates/exceptions/503.mako')
+def connection_failure(request):
+    return {'msg': 'Server connection timeout'}
+@exception_view_config(pymongo.errors.ServerSelectionTimeoutError, renderer='templates/exceptions/503.mako')
+def service_unselectable(request):
+    return {'msg': 'Can\'t find server'}
 
 
 @view_config(context=exc.HTTPBadRequest)

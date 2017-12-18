@@ -28,6 +28,7 @@ def upload_vehicle(request):
     rows = []
     # create a new trip_id based off the first GPS time reading
     timestamps = {}
+    new_trip = True
     for row in gzip.decompress(base64.b64decode(data64)).decode('ascii').splitlines():
         try:
             js = json.loads(row)
@@ -36,6 +37,7 @@ def upload_vehicle(request):
             continue
         if 'vid' not in js or 'trip_id' not in js:
             return HTTPBadRequest("Please provide a vid and trip_id on every row")
+
         if 'timestamp' in js and js['timestamp'] is not None:
             js['timestamp'] = dateutil.parser.parse(js['timestamp'])
 
@@ -43,6 +45,14 @@ def upload_vehicle(request):
                 try:
                     timestamps[js['trip_id']] = js['timestamp'].astimezone(tz_local).strftime("%Y%m%d_%H%M%S_{}".format('_'.join(js['trip_id'].split('_')[2:])))
                     # print("Changing {} to {}".format(js['trip_id'], timestamps[js['trip_id']]))
+                    if new_trip:
+                        if request.db.rpi_readings.find_one({'trip_id': timestamps[js['trip_id']]}) is not None:
+                            print("Skipping:", js['trip_id'])
+                            return {'msg': "Already seen this trip, skipping"}
+                        else:
+                            # we can go ahead with adding this trip
+                            print("Adding", js['trip_id'])
+                            new_trip = False
                 except:
                     pass
         else:
@@ -56,6 +66,10 @@ def upload_vehicle(request):
             return HTTPForbidden('You must provide a valid API key for all Vehicle IDs used')
     for row in rows:
         row['trip_id'] = timestamps[row['trip_id']]
+    if len(rows) < 30:
+        return {
+            'msg': 'Trip is too short to be of use and was rejected'
+        }
     request.db.rpi_readings.remove({'trip_id': {'$in': list(trips)+list(timestamps.values())}})
     if not rows:
         return {'inserted': 0}
