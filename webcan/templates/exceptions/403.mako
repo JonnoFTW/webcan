@@ -1,7 +1,7 @@
 <%inherit file="../layout.mako"/>
 <div class="content">
     <div class="row justify-content-md-center">
-        <div class="col-6 col-">
+        <div class="col-md-6 col-12">
             <div class="card card-inverse card-danger">
                 <div class="card-header ">
                     <h3>403: Permission Denied</h3>
