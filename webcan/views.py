@@ -44,7 +44,7 @@ def add_device_global(event):
 
 def _prep_csv(query, header, rows):
     vid = None
-    for row in query:
+    for idx, row in enumerate(query):
         if 'pos' in row:
             row['latitude'] = row['pos']['coordinates'][1]
             row['longitude'] = row['pos']['coordinates'][0]
@@ -55,7 +55,8 @@ def _prep_csv(query, header, rows):
                 del row[f]
 
         header.update(row.keys())
-        rows[row['trip_sequence']] = row
+        # rows[row['trip_sequence']] = row
+        rows.append(row)
     # print("Headers are:", header)
     return vid
 
