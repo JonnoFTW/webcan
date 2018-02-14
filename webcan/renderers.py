@@ -5,6 +5,7 @@ import shapefile
 from zipfile import ZipFile, ZipInfo, ZIP_DEFLATED
 from datetime import date, time, datetime
 import re
+import sqlite3
 
 try:
     from StringIO import StringIO  # python 2
@@ -77,6 +78,36 @@ class CSVRenderer(BaseRenderer):
         return fout.getvalue()
 
 
+class SpatialiteRenderer(BaseRenderer):
+    content_type = 'application/zip'
+
+    def __init__(self, info):
+        pass
+
+    def __call__(self, data, system):
+        self._set_ct(system)
+        fields = set()
+        for row in data:
+            row['date'] = row['timestamp'].date()
+            row['time'] = str(row['timestamp'].time())
+            del row['timestamp']
+            row = {k.replace(' ', '_'): v for k, v in row.items()}
+            fields.add(row.keys())
+        fields = sorted(fields)
+        sql_io = StringIO()
+        db = sqlite3.connect(':memory:')
+        cursor = db.cursor()
+
+        cursor.execute(f"CREATE TABLE data ({','.join([fields])})",)
+
+        zipout = BytesIO()
+        now = datetime.now()
+        date_str = 'webcan_export_{}'.format(now.strftime('%Y%m%d_%H%M%S'))
+        with ZipFile(zipout, 'w', ZIP_DEFLATED) as myzip:
+            myzip.writestr(ZipInfo(f'{date_str}.{k}', date_time=now.timetuple()), sql_io.getvalue())
+        return zipout.getvalue()
+
+
 class ShapefileRenderer(BaseRenderer):
     content_type = 'application/zip'
 
@@ -91,16 +122,33 @@ class ShapefileRenderer(BaseRenderer):
         headers = {}
 
         pattern = re.compile('[\W_]+')
-
+        old_headers = {}
         def fix_field(k: str):
-            return pattern.sub('', k.strip().replace('PID_', '').split(' ')[0])
+            remove = ['PID_TESLA', 'PID_', 'BUSTECH_', 'OUTLANDER_', 'FMS_',]
+            pieces = k.split(' ')
+            first = pieces[0]
+            if len(pieces) == 1:
+                return k
+            for r in remove:
+                k = k.replace(r, '')
+            k = pattern.sub('', k)
+            if len(k) > 15:
+                # compact underscores
+                first = ''.join(f[0] for f in first.split('_'))
+                k = first + pieces[1]
+
+            return pattern.sub('', k)
 
         for row in data:
             row['date'] = row['timestamp'].date()
             row['time'] = str(row['timestamp'].time())
             del row['timestamp']
             headers.update({fix_field(k): type(v) for k, v in row.items() if v is not None})
+            old_headers.update({k: fix_field(k) for k in row.keys() if row[k] is not None})
+
         del headers['pos']
+        del old_headers['pos']
+        # print("HEADERS: {}".format(headers))
         writer.field('latitude', 'N', '32', 15)
         writer.field('longitude', 'N', '32', 15)
         header_map = {
@@ -134,6 +182,8 @@ class ShapefileRenderer(BaseRenderer):
         dbfout = BytesIO()
         shpout = BytesIO()
         shxout = BytesIO()
+        README = StringIO()
+        README.write("Field names are:\n"+("\n".join(f"{_h} -> {_d}" for _h, _d in old_headers.items())))
         writer.save(shp=shpout, dbf=dbfout, shx=shxout)
         zipout = BytesIO()
         now = datetime.now()
@@ -141,4 +191,5 @@ class ShapefileRenderer(BaseRenderer):
         with ZipFile(zipout, 'w', ZIP_DEFLATED) as myzip:
             for k, v in [('shp', shpout), ('shx', shxout), ('dbf', dbfout)]:
                 myzip.writestr(ZipInfo(f'{date_str}.{k}', date_time=now.timetuple()), v.getvalue())
+            myzip.writestr(ZipInfo('README.txt', date_time=now.timetuple()), README.getvalue())
         return zipout.getvalue()

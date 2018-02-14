@@ -58,7 +58,8 @@ def show_device(request):
         'device': device_id,
         'trips': sorted(request.db['rpi_readings'].distinct('trip_id',
                                                             {'vid': device_id,
-                                                             'pos': {'$ne': None}}
+                                                             # 'pos': {'$ne': None}
+                                                             }
                                                             ),
                         reverse=True)
     }

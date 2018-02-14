@@ -161,7 +161,7 @@ def data_export_out(request):
              'trips': get_device_trips_for_user(request)},
             request
         )
-    renderers = ['shp', 'bson', 'csv']
+    renderers = ['shp', 'bson', 'csv', 'sqlite']
     if post['selectFormat'] in renderers:
         renderer = post['selectFormat']
     else:
