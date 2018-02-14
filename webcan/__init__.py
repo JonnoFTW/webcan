@@ -71,7 +71,7 @@ def main(global_config, **settings):
 
         def conn_close(request):
             conn.close()
-        
+
         request.add_finished_callback(conn_close)
         return db
 
@@ -97,6 +97,7 @@ def main(global_config, **settings):
     config.add_renderer('pymongo_cursor', 'webcan.renderers.PyMongoCursorRenderer')
     config.add_renderer('csv', 'webcan.renderers.CSVRenderer')
     config.add_renderer('shp', 'webcan.renderers.ShapefileRenderer')
+    config.add_renderer('sqlite', 'webcan.renderers.SpatialiteRenderer')
 
     config.scan()
     app = config.make_wsgi_app()

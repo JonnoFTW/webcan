@@ -57,6 +57,7 @@
                                             Format</label>
                                         <select id="selectFormat" name="selectFormat" class="form-control">
                                             <option value="shp">Shapefile</option>
+                                            <option value="sqlite">SpatiaLite</option>
                                             <option value="json">JSON</option>
                                             <option value="csv">CSV</option>
                                         </select>
