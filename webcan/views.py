@@ -9,6 +9,7 @@ import platform
 import pymongo
 import pymongo.errors
 import os
+import subprocess
 
 LOGIN_TYPES = ['ldap', 'external']
 USER_LEVELS = ['admin', 'viewer']
@@ -44,21 +45,34 @@ def add_device_global(event):
 
 def _prep_csv(query, header, rows):
     vid = None
+    prev = None
     for idx, row in enumerate(query):
         if 'pos' in row:
             row['latitude'] = row['pos']['coordinates'][1]
             row['longitude'] = row['pos']['coordinates'][0]
 
         vid = row['vid']
-        for f in ['vid', 'pos', 'trip_id']:
+        for f in ['vid', 'pos']:
             if f in row:
                 del row[f]
-
+        if prev is not None and prev['trip_id'] != row['trip_id']:
+            prev = None
+        if prev is not None:
+            row['dist(m)'] = (row['timestamp'] - prev['timestamp']).total_seconds() * row['spd_over_grnd'] * 0.277778
+        else:
+            row['dist(m)'] = 0
         header.update(row.keys())
         # rows[row['trip_sequence']] = row
         rows.append(row)
+        prev = row
+    to_front = ['trip_sequence', 'timestamp', 'latitude', 'longitude', 'altitude', 'spd_over_grnd', 'num_sats',
+                'dist(m)']
+    for i in to_front:
+        if i in header:
+            header.remove(i)
+    headers = to_front + sorted(header)
     # print("Headers are:", header)
-    return vid
+    return vid, headers
 
 
 @view_config(route_name='fix_pos', renderer='bson')
@@ -90,10 +104,10 @@ def trip_csv(request):
     # override attributes of response
     # iterate through the data, make a set of headers seen
     header = set()
-    rows = {}
+    rows = []
     query = request.db.rpi_readings.find({'trip_id': trip_id, 'pos': {'$ne': None}}, {'_id': False}).sort(
         [('trip_sequence', pymongo.ASCENDING)])
-    vid = _prep_csv(query, header, rows)
+    vid, header = _prep_csv(query, header, rows)
     filename = '{}_{}.csv'.format(vid.replace(' ', '_'), trip_id)
     request.response.content_disposition = 'attachment;filename=' + filename
     # put GPS fields first
@@ -104,7 +118,7 @@ def trip_csv(request):
     headers = to_front + sorted(header)
     return {
         'header': headers,
-        'rows': sorted(rows.values(), key=lambda x: x['trip_sequence']),
+        'rows': rows,
     }
 
 
@@ -123,6 +137,14 @@ def data_export(request):
         'trips': trips
     }
 
+@view_config(route_name='changelog', request_method='GET', renderer='templates/changelog.mako')
+def changelog(request):
+    # show the changelog
+
+    changes = subprocess.check_output(["git", "log", "--pretty=format:%h %an, %ar:<br><p>%s</p>"]).decode('utf-8')
+    return {
+        'changes': changes
+    }
 
 @view_config(route_name='data_export', request_method='POST')
 def data_export_out(request):
@@ -152,7 +174,7 @@ def data_export_out(request):
             }
         }
         }
-    # print(query)
+    print(query)
     data = list(request.db.rpi_readings.find(query, {'_id': False}))
     if len(data) == 0:
         return render_to_response(
@@ -170,9 +192,9 @@ def data_export_out(request):
     if renderer == 'csv':
         headers = set()
         rows = []
-        _prep_csv(data, headers, rows)
+        _, headers = _prep_csv(data, headers, rows)
         data = {
-            'header': list(headers),
+            'header': headers,
             'rows': rows,
         }
     renderer_obj = get_renderer(renderer)
@@ -203,9 +225,12 @@ def notfound(request):
 def service_unavailable(request):
     return {'msg': 'Server too busy or your query took too long'}
 
+
 @exception_view_config(pymongo.errors.ConnectionFailure, renderer='templates/exceptions/503.mako')
 def connection_failure(request):
     return {'msg': 'Server connection timeout'}
+
+
 @exception_view_config(pymongo.errors.ServerSelectionTimeoutError, renderer='templates/exceptions/503.mako')
 def service_unselectable(request):
     return {'msg': 'Can\'t find server'}

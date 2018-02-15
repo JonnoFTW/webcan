@@ -59,6 +59,8 @@ def main(global_config, **settings):
     config.add_route('fix_pos', '/fix_pos')
     config.add_route('external_reset', '/reset_password')
 
+    config.add_route('changelog', '/changelog')
+
     def add_db(request):
         conn = MongoClient(db_url.geturl(),
                            serverSelectionTimeoutMS=3000,

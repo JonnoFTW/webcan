@@ -133,6 +133,7 @@
                     <a class="nav-link" href="/export">Export</a>
                 </li>
                 <li class="nav-item"><a class="nav-link" href="/report">Reports</a></li>
+                <li class="nav-item"><a class="nav-link" href="/changelog">Changelog</a></li>
 
             </ul>
             <ul class="nav navbar-nav navbar-right">
