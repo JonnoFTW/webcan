@@ -35,6 +35,11 @@
                                     (seconds)</label> <input type="number" name="min-phase-seconds"
                                                              id="min-phase-seconds" value="2" class="form-control"/>
 
+                            </div>
+                            <div class="form-group col-12">
+                                <label for="cruise-window" class="col-12 col-form-label">Cruise Window</label>
+                                <input type="number" name="cruise-window"
+                                                             id="cruise-window" value="1" class="form-control"/>
 
                             </div>
                             <div class="form-group col-12" id="load-button">
@@ -74,11 +79,19 @@
         src="https://rawgit.com/brian3kb/graham_scan_js/master/graham_scan.min.js"></script>
 <script type="text/javascript">
     google.charts.load('current', {'packages': ['corechart', 'controls', 'table', 'gauge',]});
-    var phases = ['Idle', 'Acc from zero', 'Cruise', 'Dec to zero', 'Int Acc', 'Int Dec', 'N/A', 'Match', 'No Match'];
+
+    var _phases = ['Idle', 'Acc from zero', 'Cruise', 'Dec to zero', 'Int Acc', 'Int Dec', 'N/A'];
+    var cng_phases = ['Idle', 'Acc from zero', 'Cruise', 'Dec to zero', 'Int Acc', 'Int Dec', 'N/A', 'Match', 'No Match'];
     var speed_field = null;
 
     function drawChart(readings) {
         var data = new google.visualization.DataTable();
+        var phases;
+        if (_.has(readings[0], '__phase')) {
+            phases = cng_phases;
+        } else {
+            phases = _phases;
+        }
         data.addColumn('datetime', 'time', 'Time');
         for (var i = 0; i < phases.length; i++) {
             data.addColumn('number', 'Phase ' + i, 'speed_' + i);
@@ -88,6 +101,7 @@
 
         var rows = [];
         var trips = new Set();
+
         _.map(readings, function (r) {
             var phase = r['phase'],
                     time = new Date(r.timestamp.$date),
@@ -96,7 +110,10 @@
             var row = new Array(data.ng.length).fill({v: null});
             row[0] = {v: time};
             row[(phase) * 2 + 1] = {v: speed};
-            row[(phase) * 2 + 2] = {v: '<div style="padding: 5px; width: 125px"><b>{0} ({2})</b><br> {1} km/h ({3})</div>'.format(phases[phase], speed, phase, r['idx'])};
+            row[(phase) * 2 + 2] = {
+                v: '<div style="padding: 5px; width: 125px"><b>{0} ({2})</b><br> {1} km/h ({3})<br>Avg: {4}<br>Std: {5}<br>Spd-Avg: {6}</div>'
+                        .format(phases[phase], speed, phase, r['idx'], r['_avg_spd'], r['_std_spd'], Math.round(Math.abs(speed-r['_avg_spd'])), 2)
+            };
 
             ##             console.log(row);
             if (_.has(r, '__phase_type')) {
@@ -188,7 +205,8 @@
                 'trips': $('#select-trips').val(),
                 'devices': $('#select-vids').val(),
                 'hull': $('#map-hull').val(),
-                'min-phase-seconds': $('#min-phase-seconds').val()
+                'min-phase-seconds': $('#min-phase-seconds').val(),
+                'cruise-window': $('#cruise-window').val()
             }, function (data) {
                 var $stat_tables = $('#stat-tables');
                 $stat_tables.empty();

@@ -22,7 +22,8 @@ def calc_extra(i, previous):
             out['Petrol CO2 (g)'] = fuel_use * (co2_per_litre / 1000)
             out['Petrol cost (c)'] = fuel_use / 1000 * petrol_cents_per_litre
         if i.get('Power (kW)'):
-            energy_use = max(0, i['Power (kW)'] * time_diff / 3600 / 10 * -1)
+            i['Power (kW)'] = i['Battery Voltage (V)'] * i['Charge Current (A)'] / 1000
+            energy_use = i['Power (kW)'] * time_diff / -3600 # kWh
             out['E Used (kWh)'] = energy_use
             out['E CO2 (g)'] = energy_use * elec_kg_co2_per_kwh / 1000
             out['E cost (c)'] = energy_use * e_cents_per_kwh

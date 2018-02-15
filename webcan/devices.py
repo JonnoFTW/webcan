@@ -86,7 +86,7 @@ def trip_json(request):
         r.update(calc_extra(r, prev))
         out.append(r)
         prev = r
-    print("Fetching took: {}".format(datetime.now() - start))
+    # print("Fetching took: {}".format(datetime.now() - start))
     # out = []
     # for r in readings:
     #     if 'pos' not in r and 'latitude' in r:
