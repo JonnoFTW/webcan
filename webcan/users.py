@@ -1,4 +1,5 @@
-from .views import USER_LEVELS, LOGIN_TYPES, AJAXHttpBadRequest
+from .errors import AJAXHttpBadRequest
+from .views import USER_LEVELS, LOGIN_TYPES
 from email.message import EmailMessage
 import pyramid.httpexceptions as exc
 from pyramid.view import view_config
