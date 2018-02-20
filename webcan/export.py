@@ -71,7 +71,8 @@ def data_export_out(request):
         }
         }
     print(query)
-    data = list(request.db.rpi_readings.find(query, {'_id': False}))
+    data = list(request.db.rpi_readings.find(query, {'_id': False}).sort([('trip_id', pymongo.ASCENDING),
+                                                                ('trip_sequence', pymongo.ASCENDING)]))
     if len(data) == 0:
         return render_to_response(
             'templates/data_export.mako',

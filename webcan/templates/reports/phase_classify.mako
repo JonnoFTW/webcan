@@ -39,7 +39,7 @@
                             <div class="form-group col-12">
                                 <label for="cruise-window" class="col-12 col-form-label">Cruise Window</label>
                                 <input type="number" name="cruise-window"
-                                                             id="cruise-window" value="1" class="form-control"/>
+                                       id="cruise-window" value="1" class="form-control"/>
 
                             </div>
                             <div class="form-group col-12" id="load-button">
@@ -56,7 +56,16 @@
                                 <i class="fa fa-globe" aria-hidden="true"></i> Map Area
                                 (Select points)</label>
                             <div style="height:400px" id="map" data-markers="10"></div>
+
+                            <div class="row" style="margin-top:15px">
+                                <div class="form-group col-12">
+                                    <form action="/report/phase_csv" method="POST" id="load-csv">
+                                        <input type="submit" class="btn btn-primary" value="Export CSV"/>
+                                    </form>
+                                </div>
+                            </div>
                         </div>
+
                     </div>
 
                     <div class="row">
@@ -111,8 +120,11 @@
             row[0] = {v: time};
             row[(phase) * 2 + 1] = {v: speed};
             row[(phase) * 2 + 2] = {
-                v: '<div style="padding: 5px; width: 125px"><b>{0} ({2})</b><br> {1} km/h ({3})<br>Avg: {4}<br>Std: {5}<br>Spd-Avg: {6}</div>'
-                        .format(phases[phase], speed, phase, r['idx'], r['_avg_spd'], r['_std_spd'], Math.round(Math.abs(speed-r['_avg_spd'])), 2)
+                v: '<div style="padding: 5px; width: 125px"><b>{0} ({2})</b><br> {1} km/h ({3})<br>Avg: {4}<br>Std: {5}<br>Spd-Avg: {6}<br>Time: {7}</div>'
+                        .format(phases[phase], speed, phase,
+                                r['idx'], r['_avg_spd'], r['_std_spd'],
+                                Math.round(Math.abs(speed - r['_avg_spd']), 2),
+                                moment(new Date(r.timestamp.$date)).format('HH:mm:ss.SS'))
             };
 
             ##             console.log(row);
@@ -264,6 +276,17 @@
             }).always(function () {
                 $('#load-icon').hide();
             });
+        });
+        $('#load-csv').submit(function (ev) {
+            var $form = $(this);
+            _.forEach(['#select-trips', '#select-vids', '#map-hull', '#min-phase-seconds', '#cruise-window'], function (x) {
+                $('<input />').attr('type', 'hidden')
+                        .attr('name', x.slice(1))
+                        .attr('value', $(x).val())
+                        .appendTo($form)
+            });
+
+            return true;
         });
     });
 </script>

@@ -58,7 +58,7 @@ def main(global_config, **settings):
     config.add_route('api_upload', '/api/upload')
     config.add_route('fix_pos', '/fix_pos')
     config.add_route('external_reset', '/reset_password')
-
+    config.add_route('report_phase_for_vehicle', '/report/phase_csv')
     config.add_route('changelog', '/changelog')
 
     def add_db(request):

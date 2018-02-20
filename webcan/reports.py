@@ -1,4 +1,7 @@
-from datetime import timedelta
+from datetime import timedelta, datetime
+
+from pyramid.renderers import render_to_response, get_renderer
+
 from .utils import calc_extra
 from .views import get_device_trips_for_user
 from pyramid.view import view_config
@@ -7,11 +10,14 @@ from collections import deque, defaultdict
 from pluck import pluck
 import numpy as np
 import pymongo
-
+from webob import exc
 from itertools import groupby
+from scipy import stats
 
 phase = 'phase'
 trip_sequence = 'trip_sequence'
+SORT_TRIP_SEQ = [('trip_id', pymongo.ASCENDING),
+                 ('trip_sequence', pymongo.ASCENDING)]
 
 
 @view_config(route_name='report_list', renderer="templates/reports/list_reports.mako")
@@ -46,7 +52,7 @@ def phase_classify_render(request):
     if request.POST.getall('devices[]'):
         query['vid'] = {'$in': request.POST.getall('devices[]')}
     cursor = request.db.rpi_readings.find(query,
-                                          {'_id': False}).sort([('timestamp', pymongo.ASCENDING)])
+                                          {'_id': False}).sort(SORT_TRIP_SEQ)
 
     print("Len readings:", cursor.count())
     readings = list(cursor)
@@ -60,40 +66,119 @@ def phase_classify_render(request):
     }
 
 
+@view_config(route_name='report_phase_for_vehicle', request_method='POST', renderer="csv")
+def phase_classify_csv_render(request):
+    query = {
+        'timestamp': {'$exists': True, '$ne': None},
+        'pos': {'$ne': None}
+    }
+
+    min_phase_time = int(request.POST.get('min-phase-seconds'))
+    cruise_window = int(request.POST.get('cruise-window'))
+    if request.POST.get('select-trips'):
+        query['trip_id'] = {'$in': request.POST.get('select-trips').split(',')}
+    if request.POST.get('select-vids'):
+        query['vid'] = {'$in': request.POST.get('select-vids').split(',')}
+    if any(request.POST.getall('map-hull')):
+        query['pos'] = {
+            '$geoWithin': {
+                '$geometry': {
+                    'type': 'Polygon',
+                    'coordinates': request.POST.getall('map-hull')
+                }
+            }
+        }
+    print(request.POST)
+    print(query)
+    cursor = list(request.db.rpi_readings.find(query, {'_id': False}).sort(SORT_TRIP_SEQ))
+    trips = groupby(cursor, lambda x: x['trip_id'])
+    rows = []
+    for trip_id, readings in trips:
+        readings = list(readings)
+        prev = None
+        for i in readings:
+            i.update(calc_extra(i, prev))
+            prev = i
+        _classify_readings_with_phases_pas(readings, min_phase_time, cruise_window)
+        phase_report = per_phase_report(readings)
+        rows.extend(phase_report)
+    if len(rows) == 0:
+        raise exc.HTTPBadRequest('No data returned for query')
+    headers = rows[0].keys()
+    data = {
+        'header': headers,
+        'rows': rows,
+    }
+    renderer_obj = get_renderer('csv')
+    request.response.content_type = renderer_obj.content_type
+    request.response.content_disposition = 'attachment;filename=phase_report_{}.{}'.format(
+        datetime.now().strftime('%Y%m%d_%H%M%S'), renderer_obj.content_type.split('/')[1])
+    return render_to_response(
+        renderer_name='csv',
+        value=data,
+        request=request,
+        response=request.response
+    )
+
+
 def per_phase_report(readings):
+    """
+    For a bunch of readings, calculate some stats about every phase it did,
+    splitting up by trip_id
+    :param readings:
+    :return:
+    """
     phases = []
     for idx, phase_group in enumerate(
             [(key, list(group)) for key, group in (groupby(readings, key=lambda x: x[phase]))]):
         phase_type = phase_group[0]
         phase_no = idx
+
         p = phase_group[1]
+        if len(p) <2:
+            continue
         speeds = pluck(p, 'speed')
+        fuel_rates = pluck(p, 'FMS_FUEL_ECONOMY (L/h)', default=0)
+        fuels = pluck(p, 'Petrol Used (ml)', default=0)
+        co2s = pluck(p, 'Total CO2 (g)', default=0)
+        duration = (p[-1]['timestamp'] - p[0]['timestamp']).total_seconds()
+        accels = [(s2['speed'] - s1['speed']) / ((s2['timestamp'] - s1['timestamp']).total_seconds() / 3600) for s2, s1
+                  in zip(p, p[1:])]
+        times = pluck(p, 'timestamp')
+
+        slope, intercept, r_value, p_value, std_err = stats.linregress(np.sqrt([(x-times[0]).total_seconds() for x in times]),
+                                                                       speeds)
         phases.append({
             'date': p[0]['timestamp'].date(),
             'phasetype': phase_type,
             'phase_no': phase_no,
+            'trip_id': p[0]['trip_id'],
             'Start Time': p[0]['timestamp'].time(),
             'Finish Time': p[-1]['timestamp'].time(),
-            'Duration': (p[-1]['timestamp'] - p[0]['timestamp']).total_seconds(),
-            'Avg Temp': np.mean(pluck(p, '')),
-            'Distance': 0,
+            'Duration': duration,
+            'Avg Temp': np.mean(pluck(p, 'FMS_ENGINE_TEMP (°C)', default=0)),
+            'Distance (km)': sum(
+                vincenty(r1['pos']['coordinates'], r2['pos']['coordinates']).kilometers for r2, r1 in zip(p, p[1:])),
             'Start Speed': speeds[0],
             'Finish Speed': speeds[-1],
             'Min Speed': np.min(speeds),
             'Max Speed': np.max(speeds),
             'Mean Speed': np.mean(speeds),
-            'STdev Speed': np.std(speeds),
-            'Coeff Beta': 0,
-            'Y Intercept': 0,
-            'Min Acc': 0,
-            'Max Acc': 0,
-            'Mean Acc': 0,
+            'STDEV Speed': np.std(speeds),
+            'Coeff Beta': slope,
+            'Y Intercept': intercept,
+            'r_squared_value': r_value**2,
+            'p_value': p_value,
+            'Min Acc': np.min(accels),
+            'Max Acc': np.max(accels),
+            'Mean Acc': np.mean(accels),
+            'Total Acc': (p[-1]['speed'] - p[0]['speed']) / (duration / 3600),  # change in speed km/h
             'STDEV Acc': 0,
-            'Total Fuel': 0,
-            'Min Fuel rate': 0,
-            'Max Fuel Rate': 0,
-            'Mean Fuel Rate': 0,
-            'STDEV Fuel Rate': 0,
+            'Total Fuel (ml)': np.sum(fuels),
+            'Min Fuel rate': np.min(fuel_rates),
+            'Max Fuel Rate': np.max(fuel_rates),
+            'Mean Fuel Rate': np.mean(fuel_rates),
+            'STDEV Fuel Rate': np.std(fuel_rates),
             'Mean NOX': 0,
             'STDEV NOx': 0,
             'Mean HC': 0,
@@ -102,8 +187,8 @@ def per_phase_report(readings):
             'STDEV CH4': 0,
             'Mean CO': 0,
             'STDEV CO': 0,
-            'Mean CO2': 0,
-            'STDEV CO2': 0,
+            'Mean CO2': np.mean(co2s),
+            'STDEV CO2': np.std(co2s),
             'Mean FC': 0,
             'STDEV FC': 0,
             'Mean PM': 0,
@@ -140,9 +225,11 @@ def _summarise_readings(readings):
                 continue
             dist = 0
             duration = 0
-            phases = {"Phase {}".format(i): 0 for i in range(7)}
+            phases = {"Phase {}".format(i): 0.0 for i in range(7)}
             # print(val)
             start = val[0]['timestamp']
+            time_in_phase = defaultdict(float)
+
             for r1, r2 in zip(val, val[1:]):
                 if r1['trip_id'] != r2['trip_id']:
                     duration += (r1['timestamp'] - start).total_seconds()
@@ -150,7 +237,10 @@ def _summarise_readings(readings):
                     continue
                 dist += vincenty(r1['pos']['coordinates'], r2['pos']['coordinates']).kilometers
 
-                phases["Phase {}".format(r1[phase])] += 1
+            for phase, data in groupby(val, key=lambda x:x['phase']):
+                data = list(data)
+                phase_duration = (data[-1]['timestamp'] - data[0]['timestamp']).total_seconds()
+                phases[f"Phase {phase}"] += phase_duration
             duration += (val[-1]['timestamp'] - start).total_seconds()
             m, s = divmod(duration, 60)
             h, m = divmod(m, 60)
@@ -170,7 +260,7 @@ def _summarise_readings(readings):
             }
             for field in usages:
                 out[key][field] = round(sum(pluck(val, field, default=0)), 2)
-            out[key].update({k: "{} ({:.2f}%)".format(v, 100 * v / len(val)) for k, v in phases.items()})
+            out[key].update({k: "{} ({:.2f}%)".format(round(v,2), 100 * v / len(val)) for k, v in phases.items()})
         return out
 
     trip_stats = make_stats(trips)
@@ -234,7 +324,7 @@ def _classify_readings_with_phases_pas(readings, min_phase_time, cruise_avg_wind
         next(it)
         for idx, i in it:
             try:
-                prev, curr, post, post2 = readings[idx-1:idx+3]
+                prev, curr, post, post2 = readings[idx - 1:idx + 3]
                 avg = np.mean([prev[speed], post2[speed]])
                 if abs(prev[speed] - curr[speed]) > 25:
                     curr[speed] = avg

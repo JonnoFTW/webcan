@@ -14,6 +14,12 @@ def calc_extra(i, previous):
         petrol_cents_per_litre = 130
         elec_kg_co2_per_kwh = 0.53
         e_cents_per_kwh = 41.8
+
+        density_diesel = 0.766
+        air_diesel_ratio = 16.1
+        co2_per_litre_diesel = 2700
+        diesel_cents_per_litre = 136.5
+
         time_diff = (i['timestamp'] - previous['timestamp']).total_seconds()
         out = {}
         if i.get('PID_MAF_FLOW (grams/sec)'):
@@ -21,9 +27,14 @@ def calc_extra(i, previous):
             out['Petrol Used (ml)'] = fuel_use
             out['Petrol CO2 (g)'] = fuel_use * (co2_per_litre / 1000)
             out['Petrol cost (c)'] = fuel_use / 1000 * petrol_cents_per_litre
+        if i.get('FMS_FUEL_ECONOMY (L/h)'):
+            fuel_use = i['FMS_FUEL_ECONOMY (L/h)'] * time_diff  /3600 # use in L
+            out['Petrol Used (ml)'] = fuel_use * 1000
+            out['Petrol CO2 (g)'] = fuel_use * co2_per_litre_diesel
+            out['Petrol cost (c)'] = fuel_use * diesel_cents_per_litre
         if i.get('Power (kW)'):
             i['Power (kW)'] = i['Battery Voltage (V)'] * i['Charge Current (A)'] / 1000
-            energy_use = i['Power (kW)'] * time_diff / -3600 # kWh
+            energy_use = i['Power (kW)'] * time_diff / -3600  # kWh
             out['E Used (kWh)'] = energy_use
             out['E CO2 (g)'] = energy_use * elec_kg_co2_per_kwh / 1000
             out['E cost (c)'] = energy_use * e_cents_per_kwh
