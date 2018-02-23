@@ -1,7 +1,8 @@
 from datetime import timedelta, datetime
 
+import pytz
 from pyramid.renderers import render_to_response, get_renderer
-
+from bson.codec_options import CodecOptions
 from .utils import calc_extra
 from .views import get_device_trips_for_user
 from pyramid.view import view_config
@@ -13,6 +14,7 @@ import pymongo
 from webob import exc
 from itertools import groupby
 from scipy import stats
+from collections import deque
 
 phase = 'phase'
 trip_sequence = 'trip_sequence'
@@ -32,9 +34,11 @@ def report_list(request):
 
 @view_config(route_name='report_phase', request_method='GET', renderer="templates/reports/phase_classify.mako")
 def phase_classify(request):
+
     return {
         'trips': get_device_trips_for_user(request),
-        'docs': _classify_readings_with_phases.__doc__
+        'docs': _classify_readings_with_phases.__doc__,
+        'GET_TRIP': request.GET.get('trip_id','')
     }
 
 
@@ -51,8 +55,9 @@ def phase_classify_render(request):
         query['trip_id'] = {'$in': request.POST.getall('trips[]')}
     if request.POST.getall('devices[]'):
         query['vid'] = {'$in': request.POST.getall('devices[]')}
-    cursor = request.db.rpi_readings.find(query,
-                                          {'_id': False}).sort(SORT_TRIP_SEQ)
+    readings = request.db.rpi_readings.with_options(
+        codec_options=CodecOptions(tz_aware=True, tzinfo=pytz.timezone('Australia/Adelaide')))
+    cursor = readings.find(query, {'_id': False}).sort(SORT_TRIP_SEQ)
 
     print("Len readings:", cursor.count())
     readings = list(cursor)
@@ -100,7 +105,7 @@ def phase_classify_csv_render(request):
             i.update(calc_extra(i, prev))
             prev = i
         _classify_readings_with_phases_pas(readings, min_phase_time, cruise_window)
-        phase_report = per_phase_report(readings)
+        phase_report = per_phase_report(readings, min_phase_time)
         rows.extend(phase_report)
     if len(rows) == 0:
         raise exc.HTTPBadRequest('No data returned for query')
@@ -121,7 +126,7 @@ def phase_classify_csv_render(request):
     )
 
 
-def per_phase_report(readings):
+def per_phase_report(readings, min_duration=5):
     """
     For a bunch of readings, calculate some stats about every phase it did,
     splitting up by trip_id
@@ -133,21 +138,29 @@ def per_phase_report(readings):
             [(key, list(group)) for key, group in (groupby(readings, key=lambda x: x[phase]))]):
         phase_type = phase_group[0]
         phase_no = idx
-
         p = phase_group[1]
-        if len(p) <2:
+        duration = (p[-1]['timestamp'] - p[0]['timestamp']).total_seconds()
+        if duration < min_duration:
+            continue
+        if len(p) < 2:
             continue
         speeds = pluck(p, 'speed')
         fuel_rates = pluck(p, 'FMS_FUEL_ECONOMY (L/h)', default=0)
+        if not any(fuel_rates):
+            fuel_rates = np.array(pluck(p, 'Petrol Used (ml)', default=0))/1000 / (
+                    np.array(pluck(p, '_duration', default=0)) / 3600)
         fuels = pluck(p, 'Petrol Used (ml)', default=0)
         co2s = pluck(p, 'Total CO2 (g)', default=0)
-        duration = (p[-1]['timestamp'] - p[0]['timestamp']).total_seconds()
-        accels = [(s2['speed'] - s1['speed']) / ((s2['timestamp'] - s1['timestamp']).total_seconds() / 3600) for s2, s1
+
+        accels = [(s2['speed'] - s1['speed']) / ((s2['timestamp'] - s1['timestamp']).total_seconds()) for s1, s2
                   in zip(p, p[1:])]
         times = pluck(p, 'timestamp')
 
-        slope, intercept, r_value, p_value, std_err = stats.linregress(np.sqrt([(x-times[0]).total_seconds() for x in times]),
-                                                                       speeds)
+        slope, intercept, r_value, p_value, std_err = stats.linregress(
+            np.sqrt([(x - times[0]).total_seconds() for x in times]),
+            speeds)
+
+        energy = np.array(pluck(p, 'Total Energy (kWh)', default=0))
         phases.append({
             'date': p[0]['timestamp'].date(),
             'phasetype': phase_type,
@@ -155,49 +168,59 @@ def per_phase_report(readings):
             'trip_id': p[0]['trip_id'],
             'Start Time': p[0]['timestamp'].time(),
             'Finish Time': p[-1]['timestamp'].time(),
-            'Duration': duration,
-            'Avg Temp': np.mean(pluck(p, 'FMS_ENGINE_TEMP (°C)', default=0)),
+            'Duration (s)': duration,
+            'Avg Temp (°C)': np.mean(pluck(p, 'FMS_ENGINE_TEMP (°C)', default=0)),
             'Distance (km)': sum(
                 vincenty(r1['pos']['coordinates'], r2['pos']['coordinates']).kilometers for r2, r1 in zip(p, p[1:])),
-            'Start Speed': speeds[0],
-            'Finish Speed': speeds[-1],
-            'Min Speed': np.min(speeds),
-            'Max Speed': np.max(speeds),
-            'Mean Speed': np.mean(speeds),
-            'STDEV Speed': np.std(speeds),
-            'Coeff Beta': slope,
-            'Y Intercept': intercept,
-            'r_squared_value': r_value**2,
-            'p_value': p_value,
-            'Min Acc': np.min(accels),
-            'Max Acc': np.max(accels),
-            'Mean Acc': np.mean(accels),
-            'Total Acc': (p[-1]['speed'] - p[0]['speed']) / (duration / 3600),  # change in speed km/h
-            'STDEV Acc': 0,
+            'Start Speed (km/h)': speeds[0],
+            'Finish Speed (km/h)': speeds[-1],
+            'Min Speed (km/h)': np.min(speeds),
+            'Max Speed (km/h)': np.max(speeds),
+            'Mean Speed (km/h)': np.mean(speeds),
+            'STDEV Speed (km/h)': np.std(speeds),
+            'Coeff Beta (km/h)/√(Δt)': slope,
+            'Y Intercept (km/h)': intercept,
+            'r_squared_value': r_value ** 2,
+            # 'p_value': p_value,
+            'Min Acc ((Δkm/h)/s)': np.min(accels),
+            'Max Acc ((Δkm/h)/s)': np.max(accels),
+            'Mean Acc ((Δkm/h)/s)': np.mean(accels),
+            'Total Acc ((Δkm/h)/s)': (p[-1]['speed'] - p[0]['speed']) / duration,  # change in speed km/h
+            'STDEV Acc ((Δkm/h)/s)': np.std(accels),
             'Total Fuel (ml)': np.sum(fuels),
-            'Min Fuel rate': np.min(fuel_rates),
-            'Max Fuel Rate': np.max(fuel_rates),
-            'Mean Fuel Rate': np.mean(fuel_rates),
-            'STDEV Fuel Rate': np.std(fuel_rates),
-            'Mean NOX': 0,
-            'STDEV NOx': 0,
-            'Mean HC': 0,
-            'STDEV HC': 0,
-            'Mean CH4': 0,
-            'STDEV CH4': 0,
-            'Mean CO': 0,
-            'STDEV CO': 0,
-            'Mean CO2': np.mean(co2s),
-            'STDEV CO2': np.std(co2s),
-            'Mean FC': 0,
-            'STDEV FC': 0,
-            'Mean PM': 0,
-            'STDEV PM': 0,
-            'Mean OP': 0,
-            'STDEV OP': 0
+            'Min Fuel rate (L/h)': np.min(fuel_rates),
+            'Max Fuel Rate (L/h)': np.max(fuel_rates),
+            'Mean Fuel Rate (L/h)': np.mean(fuel_rates),
+            'STDEV Fuel Rate (L/h)': np.std(fuel_rates),
+            # 'Mean NOX': 0,
+            # 'STDEV NOx': 0,
+            # 'Mean HC': 0,
+            # 'STDEV HC': 0,
+            # 'Mean CH4': 0,
+            # 'STDEV CH4': 0,
+            # 'Mean CO': 0,
+            # 'STDEV CO': 0,
+            'Mean CO2 (g)': np.mean(co2s),
+            'STDEV CO2 (g)': np.std(co2s),
+            # 'Mean FC': 0,
+            # 'STDEV FC': 0,
+            # 'Mean PM': 0,
+            # 'STDEV PM': 0,
+            # 'Mean OP': 0,
+            # 'STDEV OP': 0
+            'Min Energy (kWh)': energy.min(),
+            'Max Energy (kWh)': energy.max(),
+            'Mean Energy (kWh)': energy.mean(),
+            'STDEV Energy (kWh)': energy.std(),
 
         })
     return phases
+
+
+def seconds_2_hms(duration):
+    m, s = divmod(duration, 60)
+    h, m = divmod(m, 60)
+    return h, m, s
 
 
 def _summarise_readings(readings):
@@ -237,22 +260,23 @@ def _summarise_readings(readings):
                     continue
                 dist += vincenty(r1['pos']['coordinates'], r2['pos']['coordinates']).kilometers
 
-            for phase, data in groupby(val, key=lambda x:x['phase']):
+            for phase, data in groupby(val, key=lambda x: f"{x['phase']}:{x['trip_id']}"):
+                phase = phase.split(':')[0]
                 data = list(data)
                 phase_duration = (data[-1]['timestamp'] - data[0]['timestamp']).total_seconds()
                 phases[f"Phase {phase}"] += phase_duration
             duration += (val[-1]['timestamp'] - start).total_seconds()
-            m, s = divmod(duration, 60)
-            h, m = divmod(m, 60)
+            h, m, s = seconds_2_hms(duration)
             usages = [
-                'Total CO2 (g)',
+                'Total CO2e (g)',
+                'Total Energy (kWh)',
                 'Petrol Used (ml)',
-                'Petrol CO2 (g)',
+                'Petrol CO2e (g)',
                 'Petrol cost (c)',
+                'P Used (kWh)',
                 'E Used (kWh)',
-                'E CO2 (g)',
+                'E CO2e (g)',
                 'E cost (c)',
-                'Total CO2 (g)'
             ]
             out[key] = {
                 'Duration': "%d:%02d:%02d" % (h, m, s),
@@ -260,7 +284,13 @@ def _summarise_readings(readings):
             }
             for field in usages:
                 out[key][field] = round(sum(pluck(val, field, default=0)), 2)
-            out[key].update({k: "{} ({:.2f}%)".format(round(v,2), 100 * v / len(val)) for k, v in phases.items()})
+            total_time = sum(phases.values())
+            out[key].update({
+                k: "{} ({:.2f}%)".format("{:02d}:{:02d}:{:02d}".format(*(int(x) for x in seconds_2_hms(v))),
+                                         100 * v / total_time) for k, v
+                in phases.items()})
+            out[key]['Start'] = val[0]['timestamp'].isoformat(' ')
+            out[key]['End'] = val[-1]['timestamp'].isoformat(' ')
         return out
 
     trip_stats = make_stats(trips)
@@ -388,6 +418,65 @@ def _classify_readings_with_phases_pas(readings, min_phase_time, cruise_avg_wind
                         #         acc_finish = None
                         #         acc_start = None
 
+    def accel_all():
+        """
+        Go through all datapoints, mark those that are increasing as accel
+        if it started at idle, use ACCEL_FROM_ZERO
+        else use INT_ACCEL
+
+        :return:
+        """
+        stack = []
+        previous = deque(readings[0:4], maxlen=4)
+        for i in readings[4:]:
+            prev3, prev2, prev1, prev = previous
+
+            if i[speed] >= prev[speed]:
+                stack.append(i)
+            elif stack:
+                # stop and mark everything in the stack
+                prev = readings[stack[0]['_idx'] - 1]
+                if prev[speed] <= 2 or prev[phase] == ACCEL_FROM_ZERO:
+                    use_phase = ACCEL_FROM_ZERO
+                else:
+                    use_phase = INT_ACCEL
+                for r in stack:
+                    if r[speed] > 2:
+                        r[phase] = use_phase
+                        readings[r['_idx'] + 1][phase] = use_phase
+                stack = []
+            previous.append(i)
+
+    def decel_all():
+        """
+        Go through all datapoints, mark those that are decreasing as decel
+        if it started at idle, use DECEL_FROM_ZERO
+        else use INT_DECEL
+
+        :return:
+        """
+        stack = []
+        prev = None
+        for i in readings[1:]:
+            if prev is None:
+                prev = readings[0]
+            else:
+                if i[speed] <= prev[speed]:
+                    stack.append(i)
+                elif stack:
+                    # stop and mark everything in the stack
+                    prev = readings[stack[-1]['_idx'] + 1]
+                    if prev[speed] <= 2 or prev[phase] == DECEL_TO_ZERO:
+                        use_phase = DECEL_TO_ZERO
+                    else:
+                        use_phase = INT_DECEL
+                    for r in stack:
+                        if r[speed] >= 2:
+                            r['phase'] = use_phase
+                            readings[r['_idx'] - 1]['phase'] = use_phase
+                    stack = []
+                prev = i
+
     def decel_to_stop():
         decc_start = False
         use_phase = DECEL_TO_ZERO
@@ -406,13 +495,16 @@ def _classify_readings_with_phases_pas(readings, min_phase_time, cruise_avg_wind
                 i[phase] = use_phase
 
                 # check if we've reached peak decel
+                cspd = i[speed]
                 if all([
-                    i[speed] >= readings[idx - 1][speed],
-                    i[speed] > readings[idx - 2][speed] - 0.5,
-                    i[speed] > readings[idx - 3][speed] - 1,
-                    i[speed] > readings[idx - 4][speed] - 1.5,
-                    i[speed] > readings[idx - 5][speed] - 2,
+                    cspd >= readings[idx - 1][speed],
+                    cspd > readings[idx - 2][speed] - 0.5,
+                    cspd > readings[idx - 3][speed] - 1,
+                    cspd > readings[idx - 4][speed] - 1.5,
+                    cspd > readings[idx - 5][speed] - 2,
                 ]):
+                    if use_phase == INT_DECEL:
+                        idx += 5
                     for r in range(idx, decc_start):
                         if readings[r][phase] != 0:
                             readings[r][phase] = use_phase
@@ -488,12 +580,6 @@ def _classify_readings_with_phases_pas(readings, min_phase_time, cruise_avg_wind
                                 readings[j][phase] = 5
                 tStart = tEnd
 
-    # def int_decel():
-
-    # def cruise_error_filter():
-    #     j = 1
-    #     duration_limit = 4
-    #     for i in range()
     def cleanup():
         for idx, i in enumerate(readings):
             try:
@@ -502,7 +588,15 @@ def _classify_readings_with_phases_pas(readings, min_phase_time, cruise_avg_wind
                 # prev = readings[idx - 1]
                 # curr = readings[idx]
                 # post = readings[idx + 1]
-
+                if i['phase'] == IDLE and i['speed'] > 2:
+                    # check if there is an int_decel before this and mark it int_decel
+                    # mark forward until we hit a non idle reading
+                    if readings[idx - 1]['phase'] == INT_DECEL:
+                        for r in readings[idx:]:
+                            if r['phase'] == IDLE:
+                                r['phase'] = INT_DECEL
+                            else:
+                                break
                 # if prev[phase] == post[phase]:
                 #     i[phase] = prev[phase]
                 # if i[phase] == 0 and i[speed] > 3:
@@ -521,20 +615,12 @@ def _classify_readings_with_phases_pas(readings, min_phase_time, cruise_avg_wind
         #         for reading in p:
         #             readings[reading['_idx']][phase] = readings[p[0]['_idx'] - 1][phase]
 
-    # def cruise():
-    #     duration_limit = 4
-    #
-    #     # for i in readings:
-    #     #     if i[phase] == 6:
-    #     #         pass
-    #     c_start = None
-    #     for idx, i in enumerate(readings):
-    #         if i[phase] == 0 and i[speed] > 5:
-    #             i[phase] = 2
-    smooth()
+    # smooth()
     idle_pass()
-    accel_from_stop()
-    decel_to_stop()
+    accel_all()
+    decel_all()
+    # accel_from_stop()
+    # decel_to_stop()
     # accel_decel()
     cruise()
     cleanup()

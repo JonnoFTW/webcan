@@ -17,7 +17,9 @@
                         <label for="time_diff">Time Diff </label>
                         <input class="form-control col-1" placeholder="Diff" name="time_diff" value="1.0"
                                id="time_diff"
-                               type="number"/>
+                               type="number"
+                               step="0.5"/>
+                        <div class="text-right float-right pull-right col" id="phase-report-link"></div>
                         <div class="text-right float-right pull-right col" id="csv-link"></div>
                     </form>
 
@@ -132,7 +134,7 @@
         window.location.hash = '#{}'.format(trip_id);
         var $csvlink = $('#csv-link');
         if (!trip_id) {
-            $('#csv-link').html('No Data for this vehicle');
+            $csvlink.html('No Data for this vehicle');
             return;
         }
         $csvlink.html('<i class="fa fa-spinner fa-pulse fa-fw"></i>\n' +
@@ -162,6 +164,7 @@
                     $csvlink.html('No data!');
                     return;
                 }
+                $('#phase-report-link').html('<a class="btn btn-sm btn-outline-secondary" href="/report/phase?trip_id={}">Phase Report</a>'.format(trip_id));
                 $csvlink.html('<a class="btn btn-sm btn-outline-primary" href="/trip/{}.csv">Get {}.csv</a>'.format(trip_id, trip_id));
                 map.removeMarkers();
                 readings.readings = show_path(readings.readings);
