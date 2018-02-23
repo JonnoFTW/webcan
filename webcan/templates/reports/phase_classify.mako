@@ -18,7 +18,12 @@
                                 <label for="select-trips" class="col-12 col-form-label">Trips</label>
                                 <select style="width:500px" multiple id="select-trips">
                                     %for trip in reversed(trips):
-                                        <option value="${trip}">${trip}</option>
+
+                                        <option value="${trip}"
+                                                %if trip == GET_TRIP:
+                                                    selected
+                                                %endif
+                                        >${trip}</option>
                                     %endfor
                                 </select>
                             </div>
@@ -33,7 +38,7 @@
                             <div class="form-group col-12">
                                 <label for="min-phase-seconds" class="col-12 col-form-label">Minimum Phase Duration
                                     (seconds)</label> <input type="number" name="min-phase-seconds"
-                                                             id="min-phase-seconds" value="2" class="form-control"/>
+                                                             id="min-phase-seconds" value="5" class="form-control"/>
 
                             </div>
                             <div class="form-group col-12">
@@ -123,7 +128,7 @@
                 v: '<div style="padding: 5px; width: 125px"><b>{0} ({2})</b><br> {1} km/h ({3})<br>Avg: {4}<br>Std: {5}<br>Spd-Avg: {6}<br>Time: {7}</div>'
                         .format(phases[phase], speed, phase,
                                 r['idx'], r['_avg_spd'], r['_std_spd'],
-                                Math.round(Math.abs(speed - r['_avg_spd']), 2),
+                                Math.round(speed - r['_avg_spd'], 2),
                                 moment(new Date(r.timestamp.$date)).format('HH:mm:ss.SS'))
             };
 
