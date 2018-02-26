@@ -34,11 +34,10 @@ def report_list(request):
 
 @view_config(route_name='report_phase', request_method='GET', renderer="templates/reports/phase_classify.mako")
 def phase_classify(request):
-
     return {
         'trips': get_device_trips_for_user(request),
         'docs': _classify_readings_with_phases.__doc__,
-        'GET_TRIP': request.GET.get('trip_id','')
+        'GET_TRIP': request.GET.get('trip_id', '')
     }
 
 
@@ -49,8 +48,8 @@ def phase_classify_render(request):
         'pos': {'$ne': None}
     }
     # print(request.POST)
-    min_phase_time = int(request.POST.get('min-phase-seconds'))
-    cruise_window = int(request.POST.get('cruise-window'))
+    min_phase_time = float(request.POST.get('min-phase-seconds'))
+    cruise_window = float(request.POST.get('cruise-window'))
     if request.POST.getall('trips[]'):
         query['trip_id'] = {'$in': request.POST.getall('trips[]')}
     if request.POST.getall('devices[]'):
@@ -135,8 +134,8 @@ def per_phase_report(readings, min_duration=5):
     """
     phases = []
     for idx, phase_group in enumerate(
-            [(key, list(group)) for key, group in (groupby(readings, key=lambda x: x[phase]))]):
-        phase_type = phase_group[0]
+            [(key, list(group)) for key, group in (groupby(readings, key=lambda x: f"{x['phase']}:{x['trip_id']}"))]):
+        phase_type = phase_group[0].split(':')[0]
         phase_no = idx
         p = phase_group[1]
         duration = (p[-1]['timestamp'] - p[0]['timestamp']).total_seconds()
@@ -145,11 +144,13 @@ def per_phase_report(readings, min_duration=5):
         if len(p) < 2:
             continue
         speeds = pluck(p, 'speed')
-        fuel_rates = pluck(p, 'FMS_FUEL_ECONOMY (L/h)', default=0)
+        fuel_rates = np.array(pluck(p, 'FMS_FUEL_ECONOMY (L/h)', default=0)) / 1000
+        durations = np.array(pluck(p, '_duration', default=0)) / 3600
+        fuels = fuel_rates * durations # should be in ml
+
         if not any(fuel_rates):
-            fuel_rates = np.array(pluck(p, 'Petrol Used (ml)', default=0))/1000 / (
-                    np.array(pluck(p, '_duration', default=0)) / 3600)
-        fuels = pluck(p, 'Petrol Used (ml)', default=0)
+            fuel_rates = np.array(pluck(p, 'Petrol Used (ml)', default=0)) / 1000 / durations
+            fuels = pluck(p, 'Petrol Used (ml)', default=0)
         co2s = pluck(p, 'Total CO2 (g)', default=0)
 
         accels = [(s2['speed'] - s1['speed']) / ((s2['timestamp'] - s1['timestamp']).total_seconds()) for s1, s2
@@ -338,6 +339,10 @@ def _classify_readings_with_phases_pas(readings, min_phase_time, cruise_avg_wind
             i['speed'] = np.floor(round(i[speed]))
             i['idx'] = "{} - {}".format(idx, speed.split(' ')[0][4:16])
             i['_idx'] = idx
+            if abs(i[speed]) <= 2:
+                i[phase] = IDLE
+            else:
+                i[phase] = NA
             idx += 1
             if prev is not None and i['trip_id'] != prev['trip_id']:
                 prev = None
@@ -349,22 +354,6 @@ def _classify_readings_with_phases_pas(readings, min_phase_time, cruise_avg_wind
     readings[:] = _readings
     speed = 'speed'
 
-    def smooth():
-        it = enumerate(readings)
-        next(it)
-        for idx, i in it:
-            try:
-                prev, curr, post, post2 = readings[idx - 1:idx + 3]
-                avg = np.mean([prev[speed], post2[speed]])
-                if abs(prev[speed] - curr[speed]) > 25:
-                    curr[speed] = avg
-                # if abs(curr[speed] - avg) > 25 and abs(post[speed] - avg) > 25:
-                #     curr[speed] = avg
-                #     post[speed] = avg
-            except (IndexError, ValueError) as e:
-                # print(e)
-                pass
-
     def check_next_5(start, up=1, s=1):
         try:
             return all([readings[start][speed] <= readings[start + up * 1][speed],
@@ -375,13 +364,6 @@ def _classify_readings_with_phases_pas(readings, min_phase_time, cruise_avg_wind
         except IndexError:
             return False
 
-    def idle_pass():
-        # do Idle pass
-        for i in readings:
-            if abs(i[speed]) <= 2:
-                i[phase] = IDLE
-            else:
-                i[phase] = NA
 
     def accel_from_stop():
         # do accel from stop
@@ -427,25 +409,25 @@ def _classify_readings_with_phases_pas(readings, min_phase_time, cruise_avg_wind
         :return:
         """
         stack = []
-        previous = deque(readings[0:4], maxlen=4)
-        for i in readings[4:]:
-            prev3, prev2, prev1, prev = previous
+        fwds = 4
+        for idx, i in enumerate(readings):
+            nexts = readings[idx+1:idx+fwds+1]
 
-            if i[speed] >= prev[speed]:
+            if len([x for x in nexts if x[speed] > i[speed]]) >= len(nexts)/2:
                 stack.append(i)
             elif stack:
                 # stop and mark everything in the stack
                 prev = readings[stack[0]['_idx'] - 1]
                 if prev[speed] <= 2 or prev[phase] == ACCEL_FROM_ZERO:
                     use_phase = ACCEL_FROM_ZERO
+                    # prev[phase] = use_phase
                 else:
                     use_phase = INT_ACCEL
                 for r in stack:
-                    if r[speed] > 2:
+                    if r[speed] > 2 and r[phase] == NA:
                         r[phase] = use_phase
                         readings[r['_idx'] + 1][phase] = use_phase
                 stack = []
-            previous.append(i)
 
     def decel_all():
         """
@@ -456,26 +438,24 @@ def _classify_readings_with_phases_pas(readings, min_phase_time, cruise_avg_wind
         :return:
         """
         stack = []
-        prev = None
         for i in readings[1:]:
-            if prev is None:
-                prev = readings[0]
-            else:
-                if i[speed] <= prev[speed]:
-                    stack.append(i)
-                elif stack:
-                    # stop and mark everything in the stack
-                    prev = readings[stack[-1]['_idx'] + 1]
-                    if prev[speed] <= 2 or prev[phase] == DECEL_TO_ZERO:
-                        use_phase = DECEL_TO_ZERO
-                    else:
-                        use_phase = INT_DECEL
-                    for r in stack:
-                        if r[speed] >= 2:
-                            r['phase'] = use_phase
-                            readings[r['_idx'] - 1]['phase'] = use_phase
-                    stack = []
-                prev = i
+            prev = readings[i['_idx']-1]
+            if i[speed] <= prev[speed] and i[phase] != IDLE:
+                stack.append(i)
+            elif stack:
+                # stop and mark everything in the stack
+                if i[phase] == IDLE:
+                    use_phase = DECEL_TO_ZERO
+                    i[phase] = use_phase
+                else:
+                    use_phase = INT_DECEL
+
+                # i[phase] = use_phase
+                for r in stack:
+                    if r[speed] >= 2 and r[phase] == NA:
+                        r['phase'] = use_phase
+                readings[stack[-1]['_idx']+1]['phase'] = use_phase
+                stack = []
 
     def decel_to_stop():
         decc_start = False
@@ -515,12 +495,16 @@ def _classify_readings_with_phases_pas(readings, min_phase_time, cruise_avg_wind
         return np.mean(speeds), np.std(speeds)
 
     def cruise():
-        for idx, i in enumerate(readings):
+        for idx, i in enumerate(readings[4:]):
+            idx += 4
             if i[speed] >= 2:
-                stack = readings[idx:idx + 6]
+                stack = readings[idx-3:idx + 2]
                 avg, std = avgStdSpeed(stack)
                 i['_avg_spd'] = round(avg, 3)
                 i['_std_spd'] = round(std, 3)
+                # if i['_std_spd'] < 1:
+                #     i[phase] = CRUISE
+                # continue
                 if all(map(lambda x: abs(x[speed] - avg) < cruise_avg_window, stack)):
                     for j in stack:
                         j[phase] = CRUISE
@@ -581,26 +565,30 @@ def _classify_readings_with_phases_pas(readings, min_phase_time, cruise_avg_wind
                 tStart = tEnd
 
     def cleanup():
-        for idx, i in enumerate(readings):
+        it = enumerate(readings)
+        for idx, i in it:
             try:
-                if i[speed] <= 2 and i['phase'] not in [DECEL_TO_ZERO, ACCEL_FROM_ZERO]:
-                    i['phase'] = IDLE
-                # prev = readings[idx - 1]
-                # curr = readings[idx]
-                # post = readings[idx + 1]
-                if i['phase'] == IDLE and i['speed'] > 2:
-                    # check if there is an int_decel before this and mark it int_decel
-                    # mark forward until we hit a non idle reading
-                    if readings[idx - 1]['phase'] == INT_DECEL:
-                        for r in readings[idx:]:
-                            if r['phase'] == IDLE:
-                                r['phase'] = INT_DECEL
-                            else:
-                                break
-                # if prev[phase] == post[phase]:
-                #     i[phase] = prev[phase]
-                # if i[phase] == 0 and i[speed] > 3:
-                #     i[phase] = prev[phase]
+                # if i[speed] <= 2 and i['phase'] not in [DECEL_TO_ZERO, ACCEL_FROM_ZERO]:
+                #     i['phase'] = IDLE
+                prev = readings[idx - 1]
+                post = readings[idx + 1]
+                if i[phase] == DECEL_TO_ZERO and post[phase] == IDLE:
+                    post[phase] = DECEL_TO_ZERO
+                    next(it)
+                if i[phase] == IDLE and post[speed] >= 2:
+                    i[phase] = ACCEL_FROM_ZERO
+                    post[phase] = ACCEL_FROM_ZERO
+                    next(it)
+                if post[phase] == prev[phase] and i[phase] != prev[phase] or i[phase] == NA:
+                    if post[phase] != NA:
+                        i[phase] = post[phase]
+                    else:
+                        i[phase] = prev[phase]
+                # if i[phase] == INT_DECEL and post[phase] != i[phase]:
+                #     i[phase] = post[phase]
+                # if i[phase] != post[phase] and post[phase] == prev[phase]:
+                #     i[phase] = post[phase]
+
             except IndexError:
                 pass
         # for idx, phase_group in enumerate(
@@ -615,14 +603,12 @@ def _classify_readings_with_phases_pas(readings, min_phase_time, cruise_avg_wind
         #         for reading in p:
         #             readings[reading['_idx']][phase] = readings[p[0]['_idx'] - 1][phase]
 
-    # smooth()
-    idle_pass()
     accel_all()
     decel_all()
+    cruise()
     # accel_from_stop()
     # decel_to_stop()
     # accel_decel()
-    cruise()
     cleanup()
     return speed
 

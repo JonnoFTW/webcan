@@ -42,7 +42,7 @@
 
                             </div>
                             <div class="form-group col-12">
-                                <label for="cruise-window" class="col-12 col-form-label">Cruise Window</label>
+                                <label for="cruise-window" class="col-12 col-form-label">Cruise Window (spd-avg considered cruise)</label>
                                 <input type="number" name="cruise-window"
                                        id="cruise-window" value="1" class="form-control"/>
 
@@ -111,7 +111,7 @@
             data.addColumn('number', 'Phase ' + i, 'speed_' + i);
             data.addColumn({type: 'string', role: 'tooltip', 'p': {'html': true}})
         }
-        var phase_colours = ['#212121', '#009688', '#D81B60', '#5E35B1', '#DCE775', '#43A047', '#616161', '#009688', '#D81B60'];
+        var phase_colours = ['#212121', '#009688', '#D81B60', '#5E35B1', '#DCE775', '#0D47A1', '#616161', '#009688', '#D81B60'];
 
         var rows = [];
         var trips = new Set();
@@ -128,7 +128,7 @@
                 v: '<div style="padding: 5px; width: 125px"><b>{0} ({2})</b><br> {1} km/h ({3})<br>Avg: {4}<br>Std: {5}<br>Spd-Avg: {6}<br>Time: {7}</div>'
                         .format(phases[phase], speed, phase,
                                 r['idx'], r['_avg_spd'], r['_std_spd'],
-                                Math.round(speed - r['_avg_spd'], 2),
+                                (speed - r['_avg_spd']).toFixed(2),
                                 moment(new Date(r.timestamp.$date)).format('HH:mm:ss.SS'))
             };
 
