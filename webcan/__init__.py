@@ -53,6 +53,7 @@ def main(global_config, **settings):
 
     config.add_route('report_list', '/report')
     config.add_route('report_phase', '/report/phase')
+    config.add_route('report_summary', '/report/summary')
 
     config.add_route('api_upload', '/api/upload')
     config.add_route('fix_pos', '/fix_pos')

@@ -45,7 +45,7 @@ def trip_csv(request):
 @view_config(route_name='data_export', request_method='POST')
 def data_export_out(request):
     post = request.POST
-    query = {'pos': {'$exists': True, '$ne': None}}
+    query = {}  # {'pos': {'$exists': True, '$ne': None}}
     # print(post)
     if post['daterange']:
         from_dt, to_dt = map(lambda x: datetime.strptime(x, '%d/%m/%Y %I:%M %p'), post['daterange'].split(' - '))
@@ -63,14 +63,15 @@ def data_export_out(request):
         n = 2
         points = [points[i:i + n] for i in range(0, len(points), n)]
         points.append(points[0])
-        query['pos'] = {'$geoWithin': {
-            '$geometry': {
-                'type': 'Polygon',
-                'coordinates': [points]
+        query['pos'] = {
+            '$geoWithin': {
+                '$geometry': {
+                    'type': 'Polygon',
+                    'coordinates': [points]
+                }
             }
         }
-        }
-    print(query)
+    # print(query)
     data = list(request.db.rpi_readings.find(query, {'_id': False}).sort([('trip_id', pymongo.ASCENDING),
                                                                           ('trip_sequence', pymongo.ASCENDING)]))
     if len(data) == 0:
