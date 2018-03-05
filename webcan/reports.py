@@ -1,5 +1,4 @@
 from datetime import timedelta, datetime
-
 import pytz
 from pyramid.renderers import render_to_response, get_renderer
 from bson.codec_options import CodecOptions
@@ -15,6 +14,7 @@ from webob import exc
 from itertools import groupby
 from scipy import stats
 from collections import deque
+from multiprocessing import Pool, Manager
 
 phase = 'phase'
 trip_sequence = 'trip_sequence'
@@ -39,6 +39,72 @@ def phase_classify(request):
         'docs': _classify_readings_with_phases.__doc__,
         'GET_TRIP': request.GET.get('trip_id', '')
     }
+
+
+@view_config(route_name='report_summary', request_method='GET', renderer='templates/reports/summary_report.mako')
+def summary_report(request):
+    """
+    Show a form where you can enter your
+    """
+    return {}
+
+
+def summarise_trip(trip_id, readings):
+    # prev = None
+    # for r in readings:
+    #     calc_extra(r, prev)
+    #     prev = r
+    trip_report = dict(trips=0, distance=0, time=0)
+
+    readings.sort(key=lambda x: x['trip_sequence'])
+    trip_report['distance'] += sum(
+        vincenty(r1['pos']['coordinates'], r2['pos']['coordinates']).kilometers for r2, r1 in
+        zip(readings, readings[1:]))
+    trip_report['trips'] += 1
+    trip_report['time'] += (readings[-1]['timestamp'] - readings[0]['timestamp']).total_seconds()
+    return trip_report
+
+
+@view_config(route_name='report_summary', request_method='POST', renderer='bson')
+def summary_report_do(request):
+    def gen_summary_report_for_vehicle(vid):
+        report = dict(trips=0, distance=0, time=0)
+        cursor = request.db.rpi_readings.find({'vid': vid, 'pos': {'$ne':None}}, {'_id': False}).sort('trip_id', 1)
+        trips = groupby(cursor, lambda x: x['trip_id'].split('_')[2])
+
+        pool = Pool()
+
+        def merge(x):
+            for k, v in x.items():
+                report[k] += v
+
+        def on_err(x):
+            print(x)
+
+        for trip_id, readings in trips:
+            # summarise_trip(trip_id, list(readings), report)
+            pool.apply_async(summarise_trip, args=(trip_id, list(readings)), callback=merge, error_callback=on_err)
+        pool.close()
+        pool.join()
+
+        return report
+
+    """
+    Summary is a dict of
+    vehicle_id: {
+        'trips': int,
+        'distance': float,
+        'time': float,
+        'petrol_used': float
+    }
+    """
+    summary = {}
+
+    # group everything by trip_id
+    for vid in request.POST.getall('devices[]'):
+        summary[vid] = gen_summary_report_for_vehicle(vid)
+
+    return {'summary': summary}
 
 
 @view_config(route_name='report_phase', request_method='POST', renderer="bson")
@@ -146,7 +212,7 @@ def per_phase_report(readings, min_duration=5):
         speeds = pluck(p, 'speed')
         fuel_rates = np.array(pluck(p, 'FMS_FUEL_ECONOMY (L/h)', default=0)) / 1000
         durations = np.array(pluck(p, '_duration', default=0)) / 3600
-        fuels = fuel_rates * durations # should be in ml
+        fuels = fuel_rates * durations  # should be in ml
 
         if not any(fuel_rates):
             fuel_rates = np.array(pluck(p, 'Petrol Used (ml)', default=0)) / 1000 / durations
@@ -364,7 +430,6 @@ def _classify_readings_with_phases_pas(readings, min_phase_time, cruise_avg_wind
         except IndexError:
             return False
 
-
     def accel_from_stop():
         # do accel from stop
         acc_start = False
@@ -411,9 +476,9 @@ def _classify_readings_with_phases_pas(readings, min_phase_time, cruise_avg_wind
         stack = []
         fwds = 4
         for idx, i in enumerate(readings):
-            nexts = readings[idx+1:idx+fwds+1]
+            nexts = readings[idx + 1:idx + fwds + 1]
 
-            if len([x for x in nexts if x[speed] > i[speed]]) >= len(nexts)/2:
+            if len([x for x in nexts if x[speed] > i[speed]]) >= len(nexts) / 2:
                 stack.append(i)
             elif stack:
                 # stop and mark everything in the stack
@@ -439,7 +504,7 @@ def _classify_readings_with_phases_pas(readings, min_phase_time, cruise_avg_wind
         """
         stack = []
         for i in readings[1:]:
-            prev = readings[i['_idx']-1]
+            prev = readings[i['_idx'] - 1]
             if i[speed] <= prev[speed] and i[phase] != IDLE:
                 stack.append(i)
             elif stack:
@@ -454,7 +519,7 @@ def _classify_readings_with_phases_pas(readings, min_phase_time, cruise_avg_wind
                 for r in stack:
                     if r[speed] >= 2 and r[phase] == NA:
                         r['phase'] = use_phase
-                readings[stack[-1]['_idx']+1]['phase'] = use_phase
+                readings[stack[-1]['_idx'] + 1]['phase'] = use_phase
                 stack = []
 
     def decel_to_stop():
@@ -498,7 +563,7 @@ def _classify_readings_with_phases_pas(readings, min_phase_time, cruise_avg_wind
         for idx, i in enumerate(readings[4:]):
             idx += 4
             if i[speed] >= 2:
-                stack = readings[idx-3:idx + 2]
+                stack = readings[idx - 3:idx + 2]
                 avg, std = avgStdSpeed(stack)
                 i['_avg_spd'] = round(avg, 3)
                 i['_std_spd'] = round(std, 3)

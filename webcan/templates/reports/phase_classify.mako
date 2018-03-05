@@ -217,6 +217,7 @@
         <%include file="../export_map.js"/>
         $('#load-phases').click(function () {
             $('#load-icon').show();
+
             $('.alert').alert('close');
             $.post('/report/phase', {
                 'trips': $('#select-trips').val(),
