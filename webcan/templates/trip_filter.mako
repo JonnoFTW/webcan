@@ -47,6 +47,7 @@
                 template: `
                     <tr>
                         <td><a :href="'/dev/${vid}#'+trip">{{trip}}</a></td>
+                        <td><a :href="'/trip/'+trip+'.csv'" role="button" class="btn btn-primary">CSV</a></td>
                         <td><div class="form-group"><input class="form-control" v-model="reason" placeholder="Reason for filtering"/></div></td>
                         <td><button class="btn btn-primary" @click="set_filter">Save</button></td>
                         <td><button class="btn btn-danger" @click="delete_filter">Delete</button></td>
@@ -100,7 +101,7 @@
             loading: true,
             trips: [],
             reasons: {},
-            tfields: ['Trip ID', 'Reason', 'Save', 'Remove Filter']
+            tfields: ['Trip ID', 'CSV', 'Reason', 'Save', 'Remove Filter']
         },
 
         mounted: function () {

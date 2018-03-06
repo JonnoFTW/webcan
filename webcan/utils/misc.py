@@ -1,4 +1,6 @@
 import numpy as np
+
+
 def calc_extra(i, previous):
     """
     Given an instantaneous reading, return the extra fields
@@ -11,7 +13,7 @@ def calc_extra(i, previous):
     else:
         air_fuel_ratio = 14.7
         density_ulp = 0.755
-        co2_per_litre = 2234.628
+        # co2_per_litre = 2234.628
         petrol_cents_per_litre = 130
 
         elec_kg_co2_per_kwh = 0.53
@@ -20,7 +22,7 @@ def calc_extra(i, previous):
         # emissions values taken from: http://www.environment.gov.au/system/files/resources/e30b1895-4870-4a1f-9b32-3a590de3dddf/files/national-greenhouse-accounts-factors-august-2016.pdf
         # density_diesel = 0.766
         # air_diesel_ratio = 16.1
-        co2_per_litre_diesel = 2700
+        # co2_per_litre_diesel = 2700
         diesel_cents_per_litre = 136.5
 
         gj_per_kl_of_euro_iv = 38.6
@@ -45,14 +47,16 @@ def calc_extra(i, previous):
             out['Petrol Used (ml)'] = fuel_use
             # out['Petrol CO2e (g)'] = fuel_use * (co2_per_litre / 1000)
             gj_used = fuel_use / 1000000 * gj_per_kl_of_gas
-            out['Petrol CO2e (g)'] = (np.array([co2_per_gj_petrol, ch4_per_gj_petrol, n2o_per_gj_petrol]) * gj_used).sum() * 1000
+            out['Petrol CO2e (g)'] = (np.array(
+                [co2_per_gj_petrol, ch4_per_gj_petrol, n2o_per_gj_petrol]) * gj_used).sum() * 1000
             out['Petrol cost (c)'] = fuel_use / 1000 * petrol_cents_per_litre
             out['P Used (kWh)'] = gj_used * gj_to_kwh
         if i.get('FMS_FUEL_ECONOMY (L/h)'):
             fuel_use = i['FMS_FUEL_ECONOMY (L/h)'] * time_diff / 3600  # use in L
             out['Petrol Used (ml)'] = fuel_use * 1000
             gj_used = fuel_use / 1000000 * gj_per_kl_of_euro_iv
-            out['Petrol CO2e (g)'] = (np.array([co2_per_gj_diesel, ch4_per_gj_diesel, n2o_per_gj_diesel]) * gj_used).sum() * 1000
+            out['Petrol CO2e (g)'] = (np.array(
+                [co2_per_gj_diesel, ch4_per_gj_diesel, n2o_per_gj_diesel]) * gj_used).sum() * 1000
             out['Petrol cost (c)'] = fuel_use * diesel_cents_per_litre
             out['P Used (kWh)'] = gj_used * gj_to_kwh
         if i.get('Battery Voltage (V)'):

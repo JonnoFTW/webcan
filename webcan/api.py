@@ -43,7 +43,8 @@ def upload_vehicle(request):
 
             if js['trip_id'] not in timestamps:
                 try:
-                    timestamps[js['trip_id']] = js['timestamp'].astimezone(tz_local).strftime("%Y%m%d_%H%M%S_{}".format('_'.join(js['trip_id'].split('_')[2:])))
+                    timestamps[js['trip_id']] = js['timestamp'].astimezone(tz_local).strftime(
+                        "%Y%m%d_%H%M%S_{}".format('_'.join(js['trip_id'].split('_')[2:])))
                     # print("Changing {} to {}".format(js['trip_id'], timestamps[js['trip_id']]))
                     if new_trip:
                         if request.db.rpi_readings.find_one({'trip_id': timestamps[js['trip_id']]}) is not None:
@@ -70,11 +71,10 @@ def upload_vehicle(request):
         return {
             'msg': 'Trip is too short to be of use and was rejected'
         }
-    request.db.rpi_readings.remove({'trip_id': {'$in': list(trips)+list(timestamps.values())}})
+    request.db.rpi_readings.remove({'trip_id': {'$in': list(trips) + list(timestamps.values())}})
     if not rows:
         return {'inserted': 0}
     res = request.db.rpi_readings.insert_many(rows)
     return {
         'inserted': len(res.inserted_ids)
     }
-

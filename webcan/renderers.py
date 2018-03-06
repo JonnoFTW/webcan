@@ -1,5 +1,4 @@
 from bson import json_util, int64
-import json
 import csv
 import shapefile
 from zipfile import ZipFile, ZipInfo, ZIP_DEFLATED
@@ -98,7 +97,7 @@ class SpatialiteRenderer(BaseRenderer):
         db = sqlite3.connect(':memory:')
         cursor = db.cursor()
 
-        cursor.execute(f"CREATE TABLE data ({','.join([fields])})",)
+        cursor.execute(f"CREATE TABLE data ({','.join([fields])})", )
 
         zipout = BytesIO()
         now = datetime.now()
@@ -123,8 +122,9 @@ class ShapefileRenderer(BaseRenderer):
 
         pattern = re.compile('[\W_]+')
         old_headers = {}
+
         def fix_field(k: str):
-            remove = ['PID_TESLA', 'PID_', 'BUSTECH_', 'OUTLANDER_', 'FMS_',]
+            remove = ['PID_TESLA', 'PID_', 'BUSTECH_', 'OUTLANDER_', 'FMS_', ]
             pieces = k.split(' ')
             first = pieces[0]
             if len(pieces) == 1:
@@ -183,7 +183,7 @@ class ShapefileRenderer(BaseRenderer):
         shpout = BytesIO()
         shxout = BytesIO()
         README = StringIO()
-        README.write("Field names are:\n"+("\n".join(f"{_h} -> {_d}" for _h, _d in old_headers.items())))
+        README.write("Field names are:\n" + ("\n".join(f"{_h} -> {_d}" for _h, _d in old_headers.items())))
         writer.save(shp=shpout, dbf=dbfout, shx=shxout)
         zipout = BytesIO()
         now = datetime.now()

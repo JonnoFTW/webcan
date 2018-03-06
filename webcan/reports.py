@@ -13,7 +13,6 @@ import pymongo
 from webob import exc
 from itertools import groupby
 from scipy import stats
-from collections import deque
 from multiprocessing import Pool
 
 phase = 'phase'
@@ -36,7 +35,7 @@ def report_list(request):
 def phase_classify(request):
     return {
         'trips': get_device_trips_for_user(request),
-        'docs': _classify_readings_with_phases.__doc__,
+        'docs': _classify_readings_with_phases_pas.__doc__,
         'GET_TRIP': request.GET.get('trip_id', '')
     }
 
@@ -395,6 +394,14 @@ def _summarise_readings(readings):
 
 
 def _classify_readings_with_phases_pas(readings, min_phase_time, cruise_avg_window=0.5):
+    """
+    0. Idle
+    1. Acceleration from zero
+    2. Cruise
+    3. Deceleration to zero
+    4. Intermediate acceleration
+    5. Intermediate deceleration
+    """
     IDLE = 0
     ACCEL_FROM_ZERO = 1
     CRUISE = 2
@@ -698,99 +705,3 @@ def _classify_readings_with_phases_pas(readings, min_phase_time, cruise_avg_wind
     # accel_decel()
     cleanup()
     return speed
-
-
-def _classify_readings_with_phases(readings):
-    """
-    Classify readings with the following schema:
-        0. Idle at 0
-        1. Acceleration from 0
-        2. Cruise
-        3. Deceleration to 0
-        4. Intermediate acceleration
-        5. Intermediate deceleration
-        6. N/A
-    """
-
-    # load into numpy
-    phase_len = 3
-    for r in readings[:phase_len]:
-        r[phase] = 0
-    last_series = deque(readings[:phase_len], maxlen=5)
-    last = None
-    from_zero = True
-    cruise_thresh = 4
-    phase_count = 0
-    phase_min_time = 5
-    last_cruise_phase = 0
-    idx = phase_len
-    dec_angle = 14
-    for r in readings[phase_len:]:
-        last_series.append(r)
-        r[phase] = 0
-        idx += 1
-        # add elements to the deque,
-        # check the angle between the first and last points
-        angle = np.arctan2(last_series[-1][speed] - last_series[0][speed],
-                           last_series[-1]['timestamp'].timestamp() - last_series[0]['timestamp'].timestamp())
-        angle = np.degrees(angle)
-
-        if r[speed] <= 5:
-            r[phase] = 0
-            last_cruise_phase = 0
-            # if last_cruise_phase == 2:
-            #     # we need to roll back and mark those previous ones as dec2zero (3)
-            #     rb = 1
-            #     while 1:
-            #         lr = readings[idx-rb]
-            #         rb += 1
-            #         if lr[phase] == 2:
-            #             lr[phase] = 3
-            #             break
-            #         else:
-            #             lr[phase] = 3
-            # else:
-        elif -10 < angle < 10:
-            r[phase] = 2
-            last_cruise_phase = 2
-        elif angle < -dec_angle:
-            r[phase] = 5
-        elif angle > dec_angle:
-            if last_cruise_phase == 2:
-                r[phase] = 4
-            else:
-                r[phase] = 1
-        else:
-            r[phase] = 0
-        r['angle'] = angle
-        print("{}\t{}\t{}\t{}".format(r['trip_sequence'], angle, r[speed], r[phase]))
-        """
-           Make sure all the readings in last_series are
-           within phase_min_time of the last_reading
-        """
-        # last_series = [i for i in last_series if (i[-1]['timestamp'] - i['timestamp']).total_seconds() <phase_min_time]
-    return
-    for r in readings:
-        if r[speed] <= 5:
-            r[phase] = 0
-        elif last is not None and phase in last:
-            if last[phase] == 0 and r[speed] != 0:
-                last[phase] = 1
-                r[phase] = 1
-            if last[phase] == 1:
-                if r[speed] < last[speed]:
-                    r[phase] = 2
-                else:
-                    r[phase] = 1
-            if last[phase] == 2:
-                diff = last[speed] - r[speed]
-                if diff >= 5:
-                    r[phase] = 5
-                elif diff <= -5:
-                    r[phase] = 4
-                else:
-                    r[phase] = 2
-        if phase not in r:
-            r[phase] = 6
-        last = r
-        last_series.append(r)

@@ -1,5 +1,4 @@
 import pymongo
-from datetime import datetime
 from pyramid.view import view_config
 import pyramid.httpexceptions as exc
 from pluck import pluck
@@ -72,7 +71,6 @@ def trip_json(request):
     readings_query = {'trip_id': trip_id,
                       'pos': {'$ne': None}
                       }
-    start = datetime.now()
     readings = list(
         request.db['rpi_readings'].find(readings_query, {'_id': False, 'vid': False, 'trip_id': False}).sort(
             [('trip_sequence', pymongo.ASCENDING)]))
@@ -104,8 +102,8 @@ def trip_json(request):
 @view_config(route_name='trips_filter', renderer='templates/trip_filter.mako')
 def trip_filter(request):
     vid = request.matchdict['vid']
-    if request.db.rpi_readings.find_one({'vid': vid}) is None:
-        raise exc.HTTPBadRequest('Invalid trip id')
+    if request.db.webcan_devices.find_one({'name': vid}) is None:
+        raise exc.HTTPBadRequest('Invalid vehicle id')
     trips = request.db.rpi_readings.distinct('trip_id', {'vid': vid})
     filters = {x['trip_id']: x['reason'] for x in request.db.webcan_trip_filters.find()}
     return {
@@ -130,7 +128,6 @@ def set_trip_filter(request):
                                                       'vid': vid,
                                                       'reason': reason}, upsert=True)
     return res.raw_result
-
 
 
 @view_config(route_name='trips_filter', request_method='DELETE', renderer='bson')
