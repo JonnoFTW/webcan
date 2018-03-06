@@ -50,6 +50,7 @@ def main(global_config, **settings):
     config.add_route('trip_json', '/trip/{trip_id}.json')
     config.add_route('data_export', '/export')
     config.add_route('trips_of_device', '/dev_trips')
+    config.add_route('trips_filter', '/trips_filter/{vid}')
 
     config.add_route('report_list', '/report')
     config.add_route('report_phase', '/report/phase')

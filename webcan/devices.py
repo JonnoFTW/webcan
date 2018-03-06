@@ -98,3 +98,46 @@ def trip_json(request):
     #         del r['longitude']
     #     out.append(r)
     return {'readings': out}
+
+
+@view_config(route_name='trips_filter', renderer='templates/trip_filter.mako')
+def trip_filter(request):
+    vid = request.matchdict['vid']
+    if request.db.rpi_readings.find_one({'vid': vid}) is None:
+        raise exc.HTTPBadRequest('Invalid trip id')
+    trips = request.db.rpi_readings.distinct('trip_id', {'vid': vid})
+    filters = {x['trip_id']: x['reason'] for x in request.db.webcan_trip_filters.find()}
+    return {
+        'trips': trips,
+        'reasons': filters,
+        'vid': vid
+    }
+
+
+@view_config(route_name='trips_filter', request_method='POST', renderer='bson')
+def set_trip_filter(request):
+    vid = request.matchdict['vid']
+    trip_id = request.POST.get('trip_id')
+    reason = request.POST.get('reason')
+    # check that such a trip exists:
+
+    query = {'trip_id': trip_id, 'vid': vid}
+    if request.db.rpi_readings.find_one(query) is None:
+        raise exc.HTTPBadRequest('Invalid trip id or vehicle id')
+    res = request.db.webcan_trip_filters.replace_one(query,
+                                                     {'trip_id': trip_id,
+                                                      'vid': vid,
+                                                      'reason': reason}, upsert=True)
+    return res.raw_result
+
+
+@view_config(route_name='trips_filter', request_method='DELETE', renderer='bson')
+def remove_trip_filter(request):
+    trip_id = request.matchdict['vid']
+    # check that such a trip exists:
+
+    query = {'trip_id': trip_id}
+    if request.db.rpi_readings.find_one(query) is None:
+        raise exc.HTTPBadRequest('Invalid trip id')
+    res = request.db.webcan_trip_filters.delete_one(query)
+    return res.raw_result

@@ -68,8 +68,14 @@ def summarise_trip(trip_id, readings):
 @view_config(route_name='report_summary', request_method='POST', renderer='bson')
 def summary_report_do(request):
     def gen_summary_report_for_vehicle(vid):
-        report = dict(trips=0, distance=0, time=0)
-        cursor = request.db.rpi_readings.find({'vid': vid, 'pos': {'$ne':None}}, {'_id': False}).sort('trip_id', 1)
+        report = dict(trips=0, distance=0, time=0, first=datetime(9999, 1, 1), last=datetime(2000, 1, 1))
+        filtered_trips = pluck(request.db.webcan_trip_filters.find({'vid': vid}), 'trip_id')
+        cursor = request.db.rpi_readings.find({
+            'vid': vid,
+            'pos': {'$ne': None},
+            'trip_id': {'$nin': filtered_trips}
+        },
+            {'_id': False}).sort('trip_id', 1)
         trips = groupby(cursor, lambda x: x['trip_id'].split('_')[2])
 
         pool = Pool()
@@ -83,7 +89,10 @@ def summary_report_do(request):
 
         for trip_id, readings in trips:
             # summarise_trip(trip_id, list(readings), report)
-            pool.apply_async(summarise_trip, args=(trip_id, list(readings)), callback=merge, error_callback=on_err)
+            lreadings = list(readings)
+            report['first'] = min(lreadings[0]['timestamp'], report['first'])
+            report['last'] = max(lreadings[-1]['timestamp'], report['last'])
+            pool.apply_async(summarise_trip, args=(trip_id, lreadings), callback=merge, error_callback=on_err)
         pool.close()
         pool.join()
 
@@ -103,7 +112,11 @@ def summary_report_do(request):
     # group everything by trip_id
     for vid in request.POST.getall('devices[]'):
         summary[vid] = gen_summary_report_for_vehicle(vid)
-
+    print(summary)
+    vals = list(summary.values())
+    summary['Aggregate'] = {key: sum(pluck(vals, key)) for key in ['trips', 'distance', 'time']}
+    summary['Aggregate']['last'] = max(pluck(vals, 'last'))
+    summary['Aggregate']['first'] = min(pluck(vals, 'first'))
     return {'summary': summary}
 
 
