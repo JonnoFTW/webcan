@@ -131,12 +131,17 @@ def phase_classify_render(request):
     cruise_window = float(request.POST.get('cruise-window'))
     if request.POST.getall('trips[]'):
         query['trip_id'] = {'$in': request.POST.getall('trips[]')}
+    else:
+        query['trip_id'] = {
+            '$nin': pluck(request.db.webcan_trip_filters.find({'vid': {'$in': request.POST.getall('devices[]')}}),
+                          'trip_id')
+        }
     if request.POST.getall('devices[]'):
         query['vid'] = {'$in': request.POST.getall('devices[]')}
     readings = request.db.rpi_readings.with_options(
         codec_options=CodecOptions(tz_aware=True, tzinfo=pytz.timezone('Australia/Adelaide')))
     cursor = readings.find(query, {'_id': False}).sort(SORT_TRIP_SEQ)
-
+    print(query)
     print("Len readings:", cursor.count())
     readings = list(cursor)
     speed = _classify_readings_with_phases_pas(readings, min_phase_time, cruise_avg_window=cruise_window)
@@ -160,6 +165,11 @@ def phase_classify_csv_render(request):
     cruise_window = int(request.POST.get('cruise-window'))
     if request.POST.get('select-trips'):
         query['trip_id'] = {'$in': request.POST.get('select-trips').split(',')}
+    else:
+        query['trip_id'] = {
+            '$nin': pluck(request.db.webcan_trip_filters.find({'vid': {'$in': request.POST.get('select-trips').split(',')}}),
+                          'trip_id')
+        }
     if request.POST.get('select-vids'):
         query['vid'] = {'$in': request.POST.get('select-vids').split(',')}
     if any(request.POST.getall('map-hull')):

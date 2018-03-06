@@ -72,7 +72,9 @@ def get_device_trips_for_user(request):
 def changelog(request):
     # show the changelog
 
-    changes = subprocess.check_output(["git", "log", "--pretty=format:%h %an, %ar:<br><p>%s</p>"]).decode('utf-8')
+    changes = subprocess.check_output(["git", "log",
+                                       "--pretty=format:<a href='https://github.com/JonnoFTW/webcan/commit/%h'>%h</a> %an, %ar:<br><p>%s</p>"]).decode(
+        'utf-8')
     return {
         'changes': changes
     }
