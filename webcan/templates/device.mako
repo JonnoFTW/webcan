@@ -1,6 +1,7 @@
 <%inherit file="layout.mako"/>
 <div class="content">
     <h1>Device: ${device}</h1>
+    <a class="btn btn-info" role="button" href="/trips_filter/${device}">Trips</a>
     <div class="row">
         <div class="col-md-12">
             <div class="card">

@@ -27,7 +27,7 @@ def connection_failure(request):
 
 @exception_view_config(pymongo.errors.ServerSelectionTimeoutError, renderer='templates/exceptions/503.mako')
 def service_unselectable(request):
-    return {'msg': 'Can\'t find server'}
+    return {'msg': 'Can\'t find database server'}
 
 
 @view_config(context=exc.HTTPBadRequest)

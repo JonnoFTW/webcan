@@ -14,7 +14,7 @@
                     </form>
                 </div>
                 <%
-                    fields = ['name', 'secret', 'make', 'model', 'type']
+                    fields = ['name', 'trips','secret', 'make', 'model', 'type']
                 %>
                 <table class="table">
                     <thead>
@@ -29,25 +29,26 @@
 
                             <tr>
                                 <td><a href="/dev/${i[fields[0]]}">${i[fields[0]]}</a></td>
+                                <td><a class="btn btn-info" role="button" href="/trips_filter/${i['name']}">Trips</a></td>
                                 <td>
                                     <div class="input-group">
                                         <!-- Target -->
                                         <%
                                             i[fields[0]] = i[fields[0]].replace(' ','-')
                                         %>
-                                        <input class='form-control' id="key-${i[fields[0]]}" value="${i[fields[1]]}">
+                                        <input class='form-control' id="key-${i[fields[0]]}" value="${i[fields[2]]}">
 
                                         <!-- Trigger -->
                                         <span class="input-group-btn">
                                             <button class="btn btn-sm btn-primary btn-clipboard"
-                                                   data-val="${i[fields[1]]}">
+                                                   data-val="${i[fields[2]]}">
                                                 <i class="fa fa-clipboard fa-1" aria-hidden="true"></i>
                                             </button>
                                         </span>
                                     </div>
                                 </td>
 
-                                %for f in fields[2:]:
+                                %for f in fields[3:]:
                                     <td>
                                         %if f in i:
                                         ${i[f]}

@@ -30,6 +30,8 @@
                                 <th>Trips</th>
                                 <th>Distance (km)</th>
                                 <th>Time</th>
+                                <th>First</th>
+                                <th>Last</th>
                                 </thead>
                                 <tbody id="output">
 
@@ -43,26 +45,30 @@
         </div>
     </div>
 </div>
-<script type="text/javascript" src="https://cdn.rawgit.com/jsmreese/moment-duration-format/master/lib/moment-duration-format.js"></script>
+<script type="text/javascript"
+        src="https://cdn.rawgit.com/jsmreese/moment-duration-format/master/lib/moment-duration-format.js"></script>
 <script>
     $(document).ready(function () {
         $('select').select2({allowClear: true, placeholder: 'Select vehicles'});
         $('#load-phases').click(function () {
             $('#load-icon').show();
-            $out = $('#output');
+            var $out = $('#output');
             $out.text('');
             $.post('/report/summary',
                     {'devices': $('#select-vids').val()},
                     function (data) {
                         var $tbl = $('#output');
-                        _.forEach(data.summary, function(row, vid) {
-                            var rowh = '<tr><td><a href="/dev/{0}">{0}</a></td><td>{1}</td><td>{2}</td><td>{3}</td></tr>'.format(
-                                vid, row.trips, row.distance.toFixed(2), moment.duration(row.time, 'seconds').format());
+                        _.forEach(data.summary, function (row, vid) {
+
+                            var rowh = '<tr><td>{0}</td><td>{1}</td><td>{2}</td><td>{3}</td><td>{4}</td><td>{5}</td></tr>'.format(
+                                    vid === 'Aggregate' ? '<b>{0}</b>'.format(vid) : '<a href="/dev/{0}">{0}</a>'.format(vid), row.trips, row.distance.toFixed(2), moment.duration(row.time, 'seconds').format(),
+                                    moment(row.first.$date), moment(row.last.$date)
+                            );
                             $tbl.append(rowh);
                         });
 
                     }).fail(function (x) {
-                $.out.text('Error:' + x);
+                $out.text('Error:' + x);
             }).always(function () {
                 $('#load-icon').hide();
             });
