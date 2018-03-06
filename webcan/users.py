@@ -11,6 +11,7 @@ import re
 
 log = logging.getLogger(__name__)
 
+
 @view_config(route_name='user_list', renderer='templates/users.mako')
 def user_list(request):
     return {
@@ -75,7 +76,7 @@ def set_password_reset(request):
         user = request.registry.settings['smtp_from']
         with SMTP(domain) as smtp:
             msg = EmailMessage()
-            msg.set_content("Please reset your webcan password using this link: "+reset_url)
+            msg.set_content("Please reset your webcan password using this link: " + reset_url)
             msg['Subject'] = "Webcan Password Reset"
             msg['From'] = user
             msg['To'] = user_obj['email']

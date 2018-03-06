@@ -1,5 +1,5 @@
 from pyramid.events import subscriber, BeforeTraversal
-from ldap3 import Server, Connection, ALL, NTLM
+from ldap3 import Server, Connection, NTLM
 from pyramid.security import remember, forget
 from datetime import datetime, timedelta
 from pyramid.view import view_config

@@ -1,7 +1,5 @@
 from pyramid.view import view_config
 from pyramid.events import BeforeRender, subscriber
-from .utils import calc_extra
-import re
 from pluck import pluck
 import platform
 import pymongo

@@ -12,6 +12,7 @@ class FSM:
         self.states = []
         self.current_state = None
         self.last_value = None
+
     def add_state(self, state):
         self.states.append(state)
 
@@ -19,6 +20,7 @@ class FSM:
         if state not in self.states:
             raise ValueError("Please start on a state in this machine")
         self.current_state = state
+
     def run(self, value):
         if self.last_value is None:
             self.last_value = value

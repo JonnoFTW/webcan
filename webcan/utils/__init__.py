@@ -1,1 +1,1 @@
-from .misc import calc_extra
+from .misc import calc_extra  # noqa
