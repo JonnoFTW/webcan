@@ -1,6 +1,7 @@
 from pyramid.view import view_config
 from pyramid.events import BeforeRender, subscriber
 from .utils import calc_extra
+import re
 from pluck import pluck
 import platform
 import pymongo
@@ -73,8 +74,8 @@ def changelog(request):
     # show the changelog
 
     changes = subprocess.check_output(["git", "log",
-                                       "--pretty=format:<a href='https://github.com/JonnoFTW/webcan/commit/%h'>%h</a> %an, %ar:<br><p>%s</p>"]).decode(
-        'utf-8')
+                                       "--pretty=tformat:<a href='https://github.com/JonnoFTW/webcan/commit/%h'>%h</a> %an, %ar:<p>%B</p>"]).decode(
+        'utf-8').replace('\n', '<br>').replace('</p><br>', '</p>')
     return {
         'changes': changes
     }

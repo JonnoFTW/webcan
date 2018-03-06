@@ -1,4 +1,4 @@
-from datetime import timedelta, datetime
+from datetime import datetime
 import pytz
 from pyramid.renderers import render_to_response, get_renderer
 from bson.codec_options import CodecOptions
@@ -6,7 +6,7 @@ from .utils import calc_extra
 from .views import get_device_trips_for_user
 from pyramid.view import view_config
 from geopy.distance import vincenty
-from collections import deque, defaultdict
+from collections import defaultdict
 from pluck import pluck
 import numpy as np
 import pymongo
@@ -14,7 +14,7 @@ from webob import exc
 from itertools import groupby
 from scipy import stats
 from collections import deque
-from multiprocessing import Pool, Manager
+from multiprocessing import Pool
 
 phase = 'phase'
 trip_sequence = 'trip_sequence'
@@ -112,7 +112,7 @@ def summary_report_do(request):
     # group everything by trip_id
     for vid in request.POST.getall('devices[]'):
         summary[vid] = gen_summary_report_for_vehicle(vid)
-    print(summary)
+    # print(summary)
     vals = list(summary.values())
     summary['Aggregate'] = {key: sum(pluck(vals, key)) for key in ['trips', 'distance', 'time']}
     summary['Aggregate']['last'] = max(pluck(vals, 'last'))
@@ -167,8 +167,9 @@ def phase_classify_csv_render(request):
         query['trip_id'] = {'$in': request.POST.get('select-trips').split(',')}
     else:
         query['trip_id'] = {
-            '$nin': pluck(request.db.webcan_trip_filters.find({'vid': {'$in': request.POST.get('select-trips').split(',')}}),
-                          'trip_id')
+            '$nin': pluck(
+                request.db.webcan_trip_filters.find({'vid': {'$in': request.POST.get('select-trips').split(',')}}),
+                'trip_id')
         }
     if request.POST.get('select-vids'):
         query['vid'] = {'$in': request.POST.get('select-vids').split(',')}
@@ -184,7 +185,7 @@ def phase_classify_csv_render(request):
     print(request.POST)
     print(query)
     cursor = list(request.db.rpi_readings.find(query, {'_id': False}).sort(SORT_TRIP_SEQ))
-    trips = groupby(cursor, lambda x: x['trip_id'])
+    trips = groupby(cursor, lambda x: x['trip_id'].split('_')[2])
     rows = []
     for trip_id, readings in trips:
         readings = list(readings)
@@ -341,7 +342,6 @@ def _summarise_readings(readings):
             phases = {"Phase {}".format(i): 0.0 for i in range(7)}
             # print(val)
             start = val[0]['timestamp']
-            time_in_phase = defaultdict(float)
 
             for r1, r2 in zip(val, val[1:]):
                 if r1['trip_id'] != r2['trip_id']:
@@ -583,10 +583,9 @@ def _classify_readings_with_phases_pas(readings, min_phase_time, cruise_avg_wind
         return np.mean(speeds), np.std(speeds)
 
     def cruise():
-        for idx, i in enumerate(readings[4:]):
-            idx += 4
+        for idx, i in enumerate(readings):
             if i[speed] >= 2:
-                stack = readings[idx - 3:idx + 2]
+                stack = readings[idx:idx + 5]
                 avg, std = avgStdSpeed(stack)
                 i['_avg_spd'] = round(avg, 3)
                 i['_std_spd'] = round(std, 3)
