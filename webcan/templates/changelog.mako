@@ -10,7 +10,6 @@
                 <div class="col-md-12">
                     ${c|n}
                 </div>
-
             % endfor
         </div>
 

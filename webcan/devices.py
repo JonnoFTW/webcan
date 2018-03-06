@@ -4,6 +4,7 @@ from pyramid.view import view_config
 import pyramid.httpexceptions as exc
 from pluck import pluck
 import secrets
+import csv
 import re
 
 from webcan.utils import calc_extra
@@ -129,6 +130,7 @@ def set_trip_filter(request):
                                                       'vid': vid,
                                                       'reason': reason}, upsert=True)
     return res.raw_result
+
 
 
 @view_config(route_name='trips_filter', request_method='DELETE', renderer='bson')
