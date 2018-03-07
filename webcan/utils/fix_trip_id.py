@@ -1,12 +1,13 @@
 import pymongo
 import pytz
 
-
+import configparser
 def main():
     utc = pytz.utc
     adl_tz = pytz.timezone('Australia/Adelaide')
-    uri = 'mongodb://mack0242:McK1Tfraf1C@traffic-db01r.it.ad.flinders.edu.au:27017/mack0242'
-
+    conf = configparser.ConfigParser()
+    conf.read('../../development.ini')
+    uri = conf['app:webcan']['mongo_uri']
     client = pymongo.MongoClient(uri)
     readings = client.mack0242.rpi_readings
 
