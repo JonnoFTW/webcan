@@ -68,7 +68,7 @@ def calc_extra(i, previous):
         if i.get('BUSTECH_BATTERY (Voltage V)'):
             i['Power (kW)'] = i['BUSTECH_BATTERY (Voltage V)'] * i['BUSTECH_BATTERY (Current A)'] / 1000
             energy_use = i['Power (kW)'] * time_diff / 3600
-            out['E Used (kWh)'] += energy_use
+            out['E Used (kWh)'] = energy_use
             out['E CO2e (g)'] = energy_use * elec_kg_co2_per_kwh / 1000
             out['E cost (c)'] = energy_use * e_cents_per_kwh
         out['Total CO2e (g)'] = out.get('E CO2e (g)', 0) + out.get('Petrol CO2e (g)', 0)

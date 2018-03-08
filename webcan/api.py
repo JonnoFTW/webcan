@@ -60,6 +60,7 @@ def upload_vehicle(request):
             continue
         device_ids.add(js['vid'])
         trips.add(js['trip_id'])
+        js['trip_key'] = js['trip_id'].split('_')[2]
         rows.append(js)
     # check if we have all the appropriate keys for the devices we want to add
     for device in request.db.webcan_devices.find({'name': {'$in': list(device_ids)}}):
