@@ -1,7 +1,9 @@
+import pytz
 import tabulate
 import configparser
 from multiprocessing import Pool
 import tqdm
+from bson import CodecOptions
 from geopy.distance import vincenty
 from pymongo import MongoClient
 from pluck import pluck
@@ -32,7 +34,7 @@ def fuel_report_trip(trip_id, p):
     co2s = pluck(p, 'Total CO2e (g)', default=0)
     idle_time = 0
     for r in p:
-        if fms_spd in r and '_duration' in r and r[fms_spd] < 2:
+        if gps_spd in r and '_duration' in r and r[gps_spd] < 2:
             idle_time += r['_duration']
     energy = np.array(pluck(p, 'Total Energy (kWh)', default=0))
     report.update({
@@ -72,20 +74,28 @@ def main():
 
     conn = MongoClient(uri)['mack0242']
     filtered_trips = pluck(conn.webcan_trip_filters.find(), 'trip_id')
+    vid_re = 'rocco_phev'
     vid_re = '^adl_metro'
     num_trips = len(set(x.split('_')[2] for x in
                         conn.rpi_readings.distinct('trip_id', {'vid': {'$regex': vid_re}}))
                     - set(x.split('_')[2] for x in filtered_trips))
     # generate a fuel consumption report
-    cursor = conn.rpi_readings.find(
-        {'vid': {'$regex': vid_re},
-         'pos': {'$exists': True},
-         'trip_id': {'$nin': filtered_trips}}).sort([('trip_key', 1)])
+    query = {
+        # 'vid': vid_re,
+        'vid': {'$regex': vid_re},
+    }
+    if filtered_trips:
+        query['trip_id'] = {'$nin': filtered_trips}
+    readings = conn.rpi_readings.with_options(
+        codec_options=CodecOptions(tz_aware=True, tzinfo=pytz.timezone('Australia/Adelaide')))
+    cursor = readings.find(query).sort([('trip_key', 1)])
     report = []
+
     prog = tqdm.tqdm(desc='Trip Reports', total=num_trips, unit=' trips')
 
     def on_complete(r):
-        report.append(r)
+        if r['Distance (km)'] >= 10:
+            report.append(r)
         prog.update()
 
     pool = Pool()
@@ -100,7 +110,7 @@ def main():
     pool.join()
     prog.close()
     import csv
-    with open('adl_metro_report_fms_speed.csv', 'w') as out:
+    with open('adl_metro_report_phev.csv', 'w') as out:
         writer = csv.DictWriter(out, fieldnames=list(report[0].keys()))
         writer.writeheader()
         writer.writerows(report)

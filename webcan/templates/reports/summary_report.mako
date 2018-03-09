@@ -18,6 +18,10 @@
                                     %endfor
                                 </select>
                             </div>
+                            <div class="form-group col-12">
+                                <label for="min-trip-distance">Minimum Trip Distance (km)</label>
+                                <input type="number" step="any" min="0" id="min-trip-distance" name="min-trip-distance" value="5" class="form-control"/>
+                            </div>
                             <div class="form-group col-12" id="load-button">
                                 <button class="btn btn-primary" id="load-phases">Load</button>
                                 <i id="load-icon" class="fa fa-refresh fa-spin fa-fw" style="display:none"></i>

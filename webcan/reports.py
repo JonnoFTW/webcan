@@ -17,7 +17,7 @@ from multiprocessing import Pool
 
 phase = 'phase'
 trip_sequence = 'trip_sequence'
-SORT_TRIP_SEQ = [('trip_id', pymongo.ASCENDING),
+SORT_TRIP_SEQ = [('trip_key', pymongo.ASCENDING),
                  ('trip_sequence', pymongo.ASCENDING)]
 
 
@@ -49,10 +49,6 @@ def summary_report(request):
 
 
 def summarise_trip(trip_id, readings):
-    # prev = None
-    # for r in readings:
-    #     calc_extra(r, prev)
-    #     prev = r
     trip_report = dict(trips=0, distance=0, time=0)
 
     readings.sort(key=lambda x: x['trip_sequence'])
@@ -61,11 +57,13 @@ def summarise_trip(trip_id, readings):
         zip(readings, readings[1:]))
     trip_report['trips'] += 1
     trip_report['time'] += (readings[-1]['timestamp'] - readings[0]['timestamp']).total_seconds()
-    return trip_report
+    return trip_report, trip_id
 
 
 @view_config(route_name='report_summary', request_method='POST', renderer='bson')
 def summary_report_do(request):
+    min_trip_distance = float(request.POST.get('min_trip_distance', 5))
+    excluded = []
     def gen_summary_report_for_vehicle(vid):
         report = dict(trips=0, distance=0, time=0, first=datetime(9999, 1, 1), last=datetime(2000, 1, 1))
         filtered_trips = pluck(request.db.webcan_trip_filters.find({'vid': vid}), 'trip_id')
@@ -74,14 +72,18 @@ def summary_report_do(request):
             'pos': {'$ne': None},
             'trip_id': {'$nin': filtered_trips}
         },
-            {'_id': False}).sort('trip_id', 1)
-        trips = groupby(cursor, lambda x: x['trip_id'].split('_')[2])
+            {'_id': False}).sort('trip_key', 1)
+        trips = groupby(cursor, lambda x: x['trip_key'])
 
         pool = Pool()
 
-        def merge(x):
-            for k, v in x.items():
-                report[k] += v
+        def merge(trip_info):
+            x, trip_id = trip_info
+            if x['distance'] >= min_trip_distance:
+                for k, v in x.items():
+                    report[k] += v
+            else:
+                excluded.append(trip_id)
 
         def on_err(x):
             print(x)
@@ -116,7 +118,7 @@ def summary_report_do(request):
     summary['Aggregate'] = {key: sum(pluck(vals, key)) for key in ['trips', 'distance', 'time']}
     summary['Aggregate']['last'] = max(pluck(vals, 'last'))
     summary['Aggregate']['first'] = min(pluck(vals, 'first'))
-    return {'summary': summary}
+    return {'summary': summary, 'excluded': excluded}
 
 
 @view_config(route_name='report_phase', request_method='POST', renderer="bson")
@@ -184,7 +186,7 @@ def phase_classify_csv_render(request):
     print(request.POST)
     print(query)
     cursor = list(request.db.rpi_readings.find(query, {'_id': False}).sort(SORT_TRIP_SEQ))
-    trips = groupby(cursor, lambda x: x['trip_id'].split('_')[2])
+    trips = groupby(cursor, lambda x: x['trip_key'])
     rows = []
     for trip_id, readings in trips:
         readings = list(readings)
@@ -349,7 +351,7 @@ def _summarise_readings(readings):
                     continue
                 dist += vincenty(r1['pos']['coordinates'], r2['pos']['coordinates']).kilometers
 
-            for phase, data in groupby(val, key=lambda x: f"{x['phase']}:{x['trip_id']}"):
+            for phase, data in groupby(val, key=lambda x: f"{x['phase']}:{x['trip_key']}"):
                 phase = phase.split(':')[0]
                 data = list(data)
                 phase_duration = (data[-1]['timestamp'] - data[0]['timestamp']).total_seconds()

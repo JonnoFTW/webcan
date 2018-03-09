@@ -58,6 +58,9 @@ def upload_vehicle(request):
                     pass
         else:
             continue
+        if 'pos' not in js:
+            # don't accept data with no lat lng
+            continue
         device_ids.add(js['vid'])
         trips.add(js['trip_id'])
         js['trip_key'] = js['trip_id'].split('_')[2]

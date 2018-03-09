@@ -1,3 +1,5 @@
+tqdm
+tabulate
 python-dateutil
 pyramid
 pyramid_mako
