@@ -63,7 +63,7 @@ def main(global_config, **settings):
 
     def add_db(request):
         conn = MongoClient(db_url.geturl(),
-                           serverSelectionTimeoutMS=3000,
+                           serverSelectionTimeoutMS=5000,
                            connectTimeoutMS=3000,
                            socketTimeoutMS=10000,
                            maxPoolSize=200,

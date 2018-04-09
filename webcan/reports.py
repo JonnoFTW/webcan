@@ -2,6 +2,8 @@ from datetime import datetime
 import pytz
 from pyramid.renderers import render_to_response, get_renderer
 from bson.codec_options import CodecOptions
+
+from webcan.errors import AJAXHttpBadRequest
 from .utils import calc_extra
 from .views import get_device_trips_for_user
 from pyramid.view import view_config
@@ -64,12 +66,12 @@ def summarise_trip(trip_id, readings):
 def summary_report_do(request):
     min_trip_distance = float(request.POST.get('min_trip_distance', 5))
     excluded = []
+
     def gen_summary_report_for_vehicle(vid):
         report = dict(trips=0, distance=0, time=0, first=datetime(9999, 1, 1), last=datetime(2000, 1, 1))
         filtered_trips = pluck(request.db.webcan_trip_filters.find({'vid': vid}), 'trip_id')
         cursor = request.db.rpi_readings.find({
             'vid': vid,
-            'pos': {'$ne': None},
             'trip_id': {'$nin': filtered_trips}
         },
             {'_id': False}).sort('trip_key', 1)
@@ -111,7 +113,10 @@ def summary_report_do(request):
     summary = {}
 
     # group everything by trip_id
-    for vid in request.POST.getall('devices[]'):
+    vids = request.POST.getall('devices[]')
+    if not vids:
+        return exc.HTTPBadRequest('Please enter at least 1 vehicle')
+    for vid in vids:
         summary[vid] = gen_summary_report_for_vehicle(vid)
     # print(summary)
     vals = list(summary.values())
@@ -124,8 +129,7 @@ def summary_report_do(request):
 @view_config(route_name='report_phase', request_method='POST', renderer="bson")
 def phase_classify_render(request):
     query = {
-        'timestamp': {'$exists': True, '$ne': None},
-        'pos': {'$ne': None}
+        'timestamp': {'$exists': True, '$ne': None}
     }
     # print(request.POST)
     min_phase_time = float(request.POST.get('min-phase-seconds'))
@@ -159,7 +163,6 @@ def phase_classify_render(request):
 def phase_classify_csv_render(request):
     query = {
         'timestamp': {'$exists': True, '$ne': None},
-        'pos': {'$ne': None}
     }
 
     min_phase_time = int(request.POST.get('min-phase-seconds'))
@@ -242,7 +245,7 @@ def per_phase_report(readings, min_duration=5):
         if not any(fuel_rates):
             fuel_rates = np.array(pluck(p, 'Petrol Used (ml)', default=0)) / 1000 / durations
             fuels = pluck(p, 'Petrol Used (ml)', default=0)
-        co2s = pluck(p, 'Total CO2 (g)', default=0)
+        co2s = pluck(p, 'Total CO2e (g)', default=0)
 
         accels = [(s2['speed'] - s1['speed']) / ((s2['timestamp'] - s1['timestamp']).total_seconds()) for s1, s2
                   in zip(p, p[1:])]

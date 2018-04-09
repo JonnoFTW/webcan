@@ -20,7 +20,8 @@
                             </div>
                             <div class="form-group col-12">
                                 <label for="min-trip-distance">Minimum Trip Distance (km)</label>
-                                <input type="number" step="any" min="0" id="min-trip-distance" name="min-trip-distance" value="5" class="form-control"/>
+                                <input type="number" step="any" min="0" id="min-trip-distance" name="min-trip-distance"
+                                       value="5" class="form-control"/>
                             </div>
                             <div class="form-group col-12" id="load-button">
                                 <button class="btn btn-primary" id="load-phases">Load</button>
@@ -57,13 +58,13 @@
         $('#load-phases').click(function () {
             $('#load-icon').show();
             var $out = $('#output');
+            $('.alert').alert('close');
             $out.text('');
             $.post('/report/summary',
                     {'devices': $('#select-vids').val()},
                     function (data) {
                         var $tbl = $('#output');
                         _.forEach(data.summary, function (row, vid) {
-
                             var rowh = '<tr><td>{0}</td><td>{1}</td><td>{2}</td><td>{3}</td><td>{4}</td><td>{5}</td></tr>'.format(
                                     vid === 'Aggregate' ? '<b>{0}</b>'.format(vid) : '<a href="/dev/{0}">{0}</a>'.format(vid), row.trips, row.distance.toFixed(2), moment.duration(row.time, 'seconds').format(),
                                     moment(row.first.$date), moment(row.last.$date)
@@ -71,8 +72,13 @@
                             $tbl.append(rowh);
                         });
 
-                    }).fail(function (x) {
-                $out.text('Error:' + x);
+                    }, 'json').fail(function (x) {
+                        $('#load-button').append(
+                                '<div class="alert alert-danger" role="alert">\n' +
+                                '  <strong>Error</strong> {}'.format(x.responseJSON.message) +
+                                '</div>');
+                        $('.alert').alert();
+
             }).always(function () {
                 $('#load-icon').hide();
             });

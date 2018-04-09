@@ -72,7 +72,7 @@ def main():
     conf.read('../../development.ini')
     uri = conf['app:webcan']['mongo_uri']
 
-    conn = MongoClient(uri)['mack0242']
+    conn = MongoClient(uri)['webcan']
     filtered_trips = pluck(conn.webcan_trip_filters.find(), 'trip_id')
     vid_re = 'rocco_phev'
     vid_re = '^adl_metro'

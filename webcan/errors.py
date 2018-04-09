@@ -33,7 +33,7 @@ def service_unselectable(request):
 @view_config(context=exc.HTTPBadRequest)
 def bad_request(exception, request):
     if request.is_xhr:
-        exception.content_type = 'application/json'
+        return exception
     return exception
 
 
