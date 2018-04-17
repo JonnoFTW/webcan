@@ -1,5 +1,31 @@
 import numpy as np
 
+air_fuel_ratio = 14.7
+density_ulp = 0.755
+# co2_per_litre = 2234.628
+petrol_cents_per_litre = 130
+
+elec_kg_co2_per_kwh = 0.53
+e_cents_per_kwh = 41.8
+
+# emissions values taken from: http://www.environment.gov.au/system/files/resources/e30b1895-4870-4a1f-9b32-3a590de3dddf/files/national-greenhouse-accounts-factors-august-2016.pdf
+# density_diesel = 0.766
+# air_diesel_ratio = 16.1
+# co2_per_litre_diesel = 2700
+diesel_cents_per_litre = 136.5
+
+gj_per_kl_of_euro_iv = 38.6
+gj_per_kl_of_gas = 34.2
+gj_to_kwh = 277.778
+
+co2_per_gj_petrol = 67.4
+ch4_per_gj_petrol = 0.5
+n2o_per_gj_petrol = 1.8
+
+co2_per_gj_diesel = 69.9
+ch4_per_gj_diesel = 0.06
+n2o_per_gj_diesel = 0.5
+
 
 def calc_extra(i, previous):
     """
@@ -11,31 +37,6 @@ def calc_extra(i, previous):
     if previous is None or (i['timestamp'] - previous['timestamp']).total_seconds() > 3:
         return {}
     else:
-        air_fuel_ratio = 14.7
-        density_ulp = 0.755
-        # co2_per_litre = 2234.628
-        petrol_cents_per_litre = 130
-
-        elec_kg_co2_per_kwh = 0.53
-        e_cents_per_kwh = 41.8
-
-        # emissions values taken from: http://www.environment.gov.au/system/files/resources/e30b1895-4870-4a1f-9b32-3a590de3dddf/files/national-greenhouse-accounts-factors-august-2016.pdf
-        # density_diesel = 0.766
-        # air_diesel_ratio = 16.1
-        # co2_per_litre_diesel = 2700
-        diesel_cents_per_litre = 136.5
-
-        gj_per_kl_of_euro_iv = 38.6
-        gj_per_kl_of_gas = 34.2
-        gj_to_kwh = 277.778
-
-        co2_per_gj_petrol = 67.4
-        ch4_per_gj_petrol = 0.5
-        n2o_per_gj_petrol = 1.8
-
-        co2_per_gj_diesel = 69.9
-        ch4_per_gj_diesel = 0.06
-        n2o_per_gj_diesel = 0.5
 
         time_diff = (i['timestamp'] - previous['timestamp']).total_seconds()
 

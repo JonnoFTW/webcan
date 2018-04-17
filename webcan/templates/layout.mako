@@ -26,8 +26,11 @@
     <!--[if lt IE 9]>
     <script src="//cdnjs.cloudflare.com/ajax/libs/html5shiv/3.7.3/html5shiv.min.js"></script>
     <script src="//cdnjs.cloudflare.com/ajax/libs/respond.js/1.4.2/respond.min.js"></script>
+    <link rel="stylesheet" href="https://cdn.datatables.net/1.10.16/css/dataTables.bootstrap4.min.css"/>
     <![endif]-->
     <script src="//cdnjs.cloudflare.com/ajax/libs/string-format/0.5.0/string-format.min.js"></script>
+    <script src="//cdn.datatables.net/1.10.16/js/jquery.dataTables.min.js"></script>
+    <script src="//cdn.datatables.net/1.10.16/js/dataTables.bootstrap4.min.js"></script>
     <script type="text/javascript">
         format.extend(String.prototype, {});
     </script>
@@ -150,7 +153,13 @@
         </div>
     </div>
 </nav>
-<div class="container">
+<div class="
+% if request.path in ['/report/fuel_all', '/report/phase']:
+    container-fluid
+%else:
+    container
+% endif
+">
     <div class="row">
         <div class="col-md-12">
             ${ next.body() }

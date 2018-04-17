@@ -54,6 +54,8 @@ def main(global_config, **settings):
     config.add_route('report_list', '/report')
     config.add_route('report_phase', '/report/phase')
     config.add_route('report_summary', '/report/summary')
+    config.add_route('report_fuel_consumption', '/report/fuel')
+    config.add_route('report_fuel_consumption_all', '/report/fuel_all')
 
     config.add_route('api_upload', '/api/upload')
     config.add_route('fix_pos', '/fix_pos')

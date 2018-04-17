@@ -13,7 +13,7 @@ import numpy as np
 
 
 def fuel_report_trip(trip_id, p):
-    report = {'trip_id': trip_id}
+    report = {'trip_key': trip_id}
     prev = None
     p.sort(key=lambda x: x['trip_sequence'])
     for r in p:
@@ -74,7 +74,7 @@ def main():
 
     conn = MongoClient(uri)['webcan']
     filtered_trips = pluck(conn.webcan_trip_filters.find(), 'trip_id')
-    vid_re = 'rocco_phev'
+    # vid_re = 'rocco_phev'
     vid_re = '^adl_metro'
     num_trips = len(set(x.split('_')[2] for x in
                         conn.rpi_readings.distinct('trip_id', {'vid': {'$regex': vid_re}}))
@@ -92,15 +92,28 @@ def main():
     report = []
 
     prog = tqdm.tqdm(desc='Trip Reports', total=num_trips, unit=' trips')
+    def parse(val):
+        return {
+            np.int64: int,
+            np.float64: float,
+        }.get(type(val), lambda x: x)(val)
 
     def on_complete(r):
+        # put this in the db
+        # print(r)
+        conn.trip_summary.insert_one({k: parse(v) for k, v in r.items()})
         if r['Distance (km)'] >= 10:
             report.append(r)
         prog.update()
-
+    def summary_exists(trip_key):
+        return conn.trip_summary.find_one({'trip_key': trip_key}) is not None
     pool = Pool()
     i = 0
+
     for trip_id, readings in groupby(cursor, key=lambda x: x['trip_key']):
+
+        if summary_exists(trip_id):
+            continue
         readings = list(readings)
         # on_complete(fuel_report_trip(trip_id, readings))
         pool.apply_async(fuel_report_trip, args=(trip_id, readings), callback=on_complete)
@@ -109,12 +122,14 @@ def main():
     pool.close()
     pool.join()
     prog.close()
+    print(tabulate.tabulate(report, headers='keys'))
+    exit()
     import csv
     with open('adl_metro_report_phev.csv', 'w') as out:
         writer = csv.DictWriter(out, fieldnames=list(report[0].keys()))
         writer.writeheader()
         writer.writerows(report)
-    print(tabulate.tabulate(report, headers='keys'))
+
 
 
 if __name__ == "__main__":

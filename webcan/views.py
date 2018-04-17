@@ -16,6 +16,9 @@ def home_view(request):
     return {}
 
 
+def _get_user_devices_ids(request):
+    objs = _get_user_devices(request)
+    return pluck(objs, 'name')
 def _get_user_devices(request):
     if request.authenticated_userid is None:
         return []

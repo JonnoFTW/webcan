@@ -5,7 +5,7 @@ from bson.codec_options import CodecOptions
 
 from webcan.errors import AJAXHttpBadRequest
 from .utils import calc_extra
-from .views import get_device_trips_for_user
+from .views import get_device_trips_for_user, _get_user_devices_ids
 from pyramid.view import view_config
 from geopy.distance import vincenty
 from collections import defaultdict
@@ -16,6 +16,9 @@ from webob import exc
 from itertools import groupby
 from scipy import stats
 from multiprocessing import Pool
+
+# import asyncio
+# import websockets
 
 phase = 'phase'
 trip_sequence = 'trip_sequence'
@@ -60,6 +63,73 @@ def summarise_trip(trip_id, readings):
     trip_report['trips'] += 1
     trip_report['time'] += (readings[-1]['timestamp'] - readings[0]['timestamp']).total_seconds()
     return trip_report, trip_id
+
+
+@view_config(route_name='report_fuel_consumption', request_method='GET', renderer='templates/reports/fuel_report.mako')
+def fuel_consumption(request):
+    return {}
+
+
+@view_config(route_name='report_fuel_consumption_all', request_method='GET',
+             renderer='templates/reports/fuel_consumption_table.mako')
+def fuel_consumption_all(request):
+    rows = request.db.trip_summary.find({'vid': {'$in': _get_user_devices_ids(request)}}, {'_id': 0})
+    return {'rows': rows}
+
+
+def trip_dist_fuel(lreadings, trip_key):
+    print("Doing trip:", trip_key)
+    dist = 0
+    fuel_usage = 0
+    prev = None
+    for r in lreadings:
+        r.update(calc_extra(r, prev))
+        fuel_usage += r.get('Petrol Used (ml)', 0)
+        if prev is not None:
+            dist += vincenty(r['pos']['coordinates'], prev['pos']['coordinates']).kilometers
+        prev = r
+    return dist, fuel_usage, trip_key
+
+
+@view_config(route_name='report_fuel_consumption', request_method='POST', renderer="bson")
+def fuel_consumption_render(request):
+    """
+    Get the data for all trips of this vehicle longer than given distance
+    Calculate total fuel usage in L, divide by 100km done to get L/100km,
+    return the list of trips -> fuel rate
+    :param request:
+    :return:
+    """
+
+    min_trip_distance = float(request.POST.get('min_trip_distance', 5))
+    excluded = []
+    device_id = request.POST.get('device')
+    out = [['Trip Key', 'Fuel Usage']]
+    trip_keys = list(set([x.split('_')[2] for x in request.db.rpi_readings.distinct('trip_id', {'vid': device_id})]))
+
+    def merge(res):
+        dist, fuel_usage, trip_key = res
+        fuel_litres = fuel_usage * 0.001
+        dist_100km = dist / 100.
+        fuel_usage_rate_per_100km = fuel_litres / dist_100km
+        suffix = "{} {}km {} mL {} L/100km".format(trip_key, dist, fuel_usage, fuel_usage_rate_per_100km)
+        if dist >= min_trip_distance:
+            out.append([trip_key, int(fuel_usage_rate_per_100km)])
+            # print("Accepted", suffix)
+        # else:
+        #     print("Rejected", suffix)
+
+    pool = Pool(8)
+    for trip_key in trip_keys:
+        cached = request.db.trip_summary.find_one({'trip_key': trip_key, 'vid': device_id})
+        if cached is None:
+            readings = list(request.db.rpi_readings.find({'trip_key': trip_key}))
+            pool.apply_async(trip_dist_fuel, args=(readings, trip_key), callback=merge, error_callback=print)
+        else:
+            merge((cached[f] for f in ('Distance (km)', 'Total Fuel (ml)', 'trip_key')))
+    pool.close()
+    pool.join()
+    return out
 
 
 @view_config(route_name='report_summary', request_method='POST', renderer='bson')
