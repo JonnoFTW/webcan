@@ -56,6 +56,7 @@ def main(global_config, **settings):
     config.add_route('report_summary', '/report/summary')
     config.add_route('report_fuel_consumption', '/report/fuel')
     config.add_route('report_fuel_consumption_all', '/report/fuel_all')
+    config.add_route('report_phase_plot', '/report/phase_plot')
 
     config.add_route('api_upload', '/api/upload')
     config.add_route('fix_pos', '/fix_pos')
@@ -65,7 +66,7 @@ def main(global_config, **settings):
 
     def add_db(request):
         conn = MongoClient(db_url.geturl(),
-                           serverSelectionTimeoutMS=5000,
+                           serverSelectionTimeoutMS=10000,
                            connectTimeoutMS=3000,
                            socketTimeoutMS=10000,
                            maxPoolSize=200,

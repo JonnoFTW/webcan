@@ -17,21 +17,15 @@
                                         <option value="${d['name']}">${d['name']}</option>
                                     %endfor
                                 </select>
-                            </div>
-                            <div class="form-group col-12">
-                                <label for="min-trip-distance">Minimum Trip Distance (km)</label>
-                                <input type="number" step="any" min="0" id="min-trip-distance" name="min-trip-distance"
-                                       value="5" class="form-control"/>
-                            </div>
+                           </div>
+
                             <div class="form-group col-12" id="load-button">
                                 <button class="btn btn-primary" id="load-phases">Load</button>
                                 <i id="load-icon" class="fa fa-refresh fa-spin fa-fw" style="display:none"></i>
                             </div>
                         </div>
                         <div class="col-12" id="chart_div" style="height: 900px">
-
-                            ## Histogram of litres per 100km
-## Basically just need to json in the fuel consumption of every trip we have, bin width  1
+                            ## charts, first one shows accel phases
 
                         </div>
                     </div>
@@ -43,25 +37,21 @@
 <script type="text/javascript" src="https://www.gstatic.com/charts/loader.js"></script>
 <script>
     function drawChart(dataIn, vehicleId) {
-        var data = google.visualization.arrayToDataTable(dataIn['table']);
-        var title = 'Histogram of Fuel Economy (L/100km) for {0}\nn={1}, std={2} mean={3}'.format(
-            vehicleId, dataIn['table'].length - 1, dataIn['std'], dataIn['mean']);
+        var data = google.visualization.arrayToDataTable(dataIn);
+        var title = 'Duration vs. CO2e for {0} n={1}'.format(
+            vehicleId, dataIn.length - 1);
         var options = {
             title: title,
-            legend: {position: 'none'},
-            histogram: {
-                 bucketSize: 1,
-                minValue: 0,
-                 ##  maxValue: 80
-             },
-            vAxis: {title: 'Count'},
+            vAxis: {title: 'CO2e (g)'},
             hAxis: {
-                title: 'L/100km',
-                ##  ticks: _.range(0, 60)
-            }
+                title: 'Duration (s)'
+            },
+            trendlines: {0: {
+                color: 'red',
+                visibleInLegend: true
+                }}
         };
-
-        var chart = new google.visualization.Histogram(document.getElementById('chart_div'));
+        var chart = new google.visualization.ScatterChart(document.getElementById('chart_div'));
         chart.draw(data, options);
     }
 
@@ -75,8 +65,8 @@
             $('.alert').alert('close');
             $out.text('');
             var vehicle_id = $('#select-vid').val();
-            $.post('/report/fuel',
-                    {'device': vehicle_id},
+            $.post('/report/phase_plot',
+                    {'vid': [vehicle_id]},
                     function (data) {
                         drawChart(data, vehicle_id);
                     }, 'json').fail(function (x) {

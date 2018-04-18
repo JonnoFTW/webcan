@@ -22,7 +22,7 @@ from multiprocessing import Pool
 
 phase = 'phase'
 trip_sequence = 'trip_sequence'
-SORT_TRIP_SEQ = [('trip_key', pymongo.ASCENDING),
+SORT_TRIP_SEQ = [('trip_id', pymongo.ASCENDING),
                  ('trip_sequence', pymongo.ASCENDING)]
 
 
@@ -70,10 +70,35 @@ def fuel_consumption(request):
     return {}
 
 
+@view_config(route_name='report_phase_plot', request_method='GET', renderer='templates/reports/phase_plots.mako')
+def phase_plot(request):
+    return {}
+
+
+@view_config(route_name='report_phase_plot', request_method='POST', renderer='bson')
+def phase_plot_render(request):
+    # get the requested vehicle/trips from trip_summary
+    trip_keys = request.POST.get('trip_key[]')
+    vids = request.POST.getall('vid[]')
+    query = {'Distance (km)': {'$gte': 5}, 'phases': {'$exists': True}}
+    if trip_keys:
+        query['trip_key'] = {'$in': trip_keys}
+    if vids:
+        query['vid'] = {'$in': vids}
+    print(query)
+    trips = request.db.trip_summary.find(query)
+    out = [['duration', 'energy']]
+    for t in trips:
+        for phase in t['phases']:
+            if phase['phasetype'] == 1:
+                out.append([phase[f] for f in ['Duration (s)', 'Total Energy (kWh)']])
+    return out
+
+
 @view_config(route_name='report_fuel_consumption_all', request_method='GET',
              renderer='templates/reports/fuel_consumption_table.mako')
 def fuel_consumption_all(request):
-    rows = request.db.trip_summary.find({'vid': {'$in': _get_user_devices_ids(request)}}, {'_id': 0})
+    rows = request.db.trip_summary.find({'vid': {'$in': _get_user_devices_ids(request)}}, {'_id': 0, 'phases': 0})
     return {'rows': rows}
 
 
@@ -114,14 +139,14 @@ def fuel_consumption_render(request):
         fuel_usage_rate_per_100km = fuel_litres / dist_100km
         suffix = "{} {}km {} mL {} L/100km".format(trip_key, dist, fuel_usage, fuel_usage_rate_per_100km)
         if dist >= min_trip_distance:
-            out.append([trip_key, int(fuel_usage_rate_per_100km)])
+            out.append([trip_key, fuel_usage_rate_per_100km])
             # print("Accepted", suffix)
         # else:
         #     print("Rejected", suffix)
 
     pool = Pool(8)
     for trip_key in trip_keys:
-        cached = request.db.trip_summary.find_one({'trip_key': trip_key, 'vid': device_id})
+        cached = request.db.trip_summary.find_one({'trip_key': trip_key, 'vid': device_id}, {'_id':0, 'phases': 0})
         if cached is None:
             readings = list(request.db.rpi_readings.find({'trip_key': trip_key}))
             pool.apply_async(trip_dist_fuel, args=(readings, trip_key), callback=merge, error_callback=print)
@@ -129,7 +154,12 @@ def fuel_consumption_render(request):
             merge((cached[f] for f in ('Distance (km)', 'Total Fuel (ml)', 'trip_key')))
     pool.close()
     pool.join()
-    return out
+    fuel_usages = np.array(out[1:])[:, 1].astype(np.float)
+    return {
+        'table': out,
+        'std': round(np.std(fuel_usages), 2),
+        'mean': round(np.mean(fuel_usages), 2)
+    }
 
 
 @view_config(route_name='report_summary', request_method='POST', renderer='bson')
@@ -232,7 +262,7 @@ def phase_classify_render(request):
 @view_config(route_name='report_phase_for_vehicle', request_method='POST', renderer="csv")
 def phase_classify_csv_render(request):
     query = {
-        'timestamp': {'$exists': True, '$ne': None},
+        # 'timestamp': {'$exists': True, '$ne': None},
     }
 
     min_phase_time = int(request.POST.get('min-phase-seconds'))
@@ -258,7 +288,7 @@ def phase_classify_csv_render(request):
         }
     print(request.POST)
     print(query)
-    cursor = list(request.db.rpi_readings.find(query, {'_id': False}).sort(SORT_TRIP_SEQ))
+    cursor = request.db.rpi_readings.find(query, {'_id': False}).sort(SORT_TRIP_SEQ)
     trips = groupby(cursor, lambda x: x['trip_key'])
     rows = []
     for trip_id, readings in trips:
@@ -327,12 +357,11 @@ def per_phase_report(readings, min_duration=5):
 
         energy = np.array(pluck(p, 'Total Energy (kWh)', default=0))
         phases.append({
-            'date': p[0]['timestamp'].date(),
-            'phasetype': phase_type,
+            'phasetype': int(phase_type),
             'phase_no': phase_no,
             'trip_id': p[0]['trip_id'],
-            'Start Time': p[0]['timestamp'].time(),
-            'Finish Time': p[-1]['timestamp'].time(),
+            'Start Time': p[0]['timestamp'],
+            'Finish Time': p[-1]['timestamp'],
             'Duration (s)': duration,
             'Avg Temp (°C)': np.mean(pluck(p, 'FMS_ENGINE_TEMP (°C)', default=0)),
             'Distance (km)': sum(
@@ -367,6 +396,7 @@ def per_phase_report(readings, min_duration=5):
             # 'STDEV CO': 0,
             'Mean CO2 (g)': np.mean(co2s),
             'STDEV CO2 (g)': np.std(co2s),
+            'Total CO2 (g)': np.sum(co2s),
             # 'Mean FC': 0,
             # 'STDEV FC': 0,
             # 'Mean PM': 0,
@@ -377,6 +407,7 @@ def per_phase_report(readings, min_duration=5):
             'Max Energy (kWh)': energy.max(),
             'Mean Energy (kWh)': energy.mean(),
             'STDEV Energy (kWh)': energy.std(),
+            'Total Energy (kWh)': energy.sum()
 
         })
     return phases

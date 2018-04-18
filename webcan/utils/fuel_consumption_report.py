@@ -67,6 +67,13 @@ def fuel_report_trip(trip_id, p):
     return report
 
 
+def parse(val):
+    return {
+        np.int64: int,
+        np.float64: float,
+    }.get(type(val), lambda x: x)(val)
+
+
 def main():
     conf = configparser.ConfigParser()
     conf.read('../../development.ini')
@@ -92,11 +99,6 @@ def main():
     report = []
 
     prog = tqdm.tqdm(desc='Trip Reports', total=num_trips, unit=' trips')
-    def parse(val):
-        return {
-            np.int64: int,
-            np.float64: float,
-        }.get(type(val), lambda x: x)(val)
 
     def on_complete(r):
         # put this in the db
@@ -105,8 +107,10 @@ def main():
         if r['Distance (km)'] >= 10:
             report.append(r)
         prog.update()
+
     def summary_exists(trip_key):
         return conn.trip_summary.find_one({'trip_key': trip_key}) is not None
+
     pool = Pool()
     i = 0
 
@@ -129,7 +133,6 @@ def main():
         writer = csv.DictWriter(out, fieldnames=list(report[0].keys()))
         writer.writeheader()
         writer.writerows(report)
-
 
 
 if __name__ == "__main__":
