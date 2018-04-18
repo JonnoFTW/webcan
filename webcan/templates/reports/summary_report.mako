@@ -65,26 +65,32 @@
                     function (data) {
                         var $tbl = $('#output');
                         _.forEach(data.summary, function (row, vid) {
-                            var rowh = '<tr><td>{0}</td><td>{1}</td><td>{2}</td><td>{3}</td><td>{4}</td><td>{5}</td></tr>'.format(
-                                    vid === 'Aggregate' ? '<b>{0}</b>'.format(vid) : '<a href="/dev/{0}">{0}</a>'.format(vid), row.trips, row.distance.toFixed(2), moment.duration(row.time, 'seconds').format(),
-                                    moment(row.first.$date), moment(row.last.$date)
-                            );
+                            if (row.trips === 0) {
+ var rowh = '<tr><td>{0}</td><td>{1}</td><td>0</td><td>0</td><td></td><td></td></tr>'.format(
+                                        vid === 'Aggregate' ? '<b>{0}</b>'.format(vid) : '<a href="/dev/{0}">{0}</a>'.format(vid), row.trips);
+                            } else {
+                                var rowh = '<tr><td>{0}</td><td>{1}</td><td>{2}</td><td>{3}</td><td>{4}</td><td>{5}</td></tr>'.format(
+                                        vid === 'Aggregate' ? '<b>{0}</b>'.format(vid) : '<a href="/dev/{0}">{0}</a>'.format(vid), row.trips, row.distance.toFixed(2), moment.duration(row.time, 'seconds').format(),
+                                        moment(row.first.$date), moment(row.last.$date)
+                                );
+                            }
                             $tbl.append(rowh);
                         });
 
                     }, 'json').fail(function (x) {
-                        console.log(x);
-                        $('#load-button').append(
-                                '<div class="alert alert-danger" role="alert">\n' +
-                                '  <strong>Error</strong> {}'.format(x.responseJSON.message) +
-                                '</div>');
-                        $('.alert').alert();
+                console.log(x);
+                $('#load-button').append(
+                        '<div class="alert alert-danger" role="alert">\n' +
+                        '  <strong>Error</strong> {}'.format(x.responseJSON.message) +
+                        '</div>');
+                $('.alert').alert();
 
             }).always(function () {
                 $('#load-icon').hide();
             });
         });
-    });
+    })
+    ;
 
 
 </script>

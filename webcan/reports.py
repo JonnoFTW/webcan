@@ -72,7 +72,8 @@ def fuel_consumption(request):
 
 @view_config(route_name='report_phase_plot', request_method='GET', renderer='templates/reports/phase_plots.mako')
 def phase_plot(request):
-    return {}
+    fields = request.db.trip_summary.find_one({'$where': 'this.phases.length>0'})['phases'][0].keys()
+    return {'fields': fields}
 
 
 @view_config(route_name='report_phase_plot', request_method='POST', renderer='bson')
@@ -85,13 +86,17 @@ def phase_plot_render(request):
         query['trip_key'] = {'$in': trip_keys}
     if vids:
         query['vid'] = {'$in': vids}
+    x = request.POST['x']
+    y = request.POST['y']
+    phases = request.POST.getall('phases[]')
     print(query)
+    print(request.POST)
     trips = request.db.trip_summary.find(query)
-    out = [['duration', 'energy']]
+    out = [[x, y]]
     for t in trips:
         for phase in t['phases']:
-            if phase['phasetype'] == 1:
-                out.append([phase[f] for f in ['Duration (s)', 'Total Energy (kWh)']])
+            if phase['phasetype'] in [int(p) for p in phases]:
+                out.append([phase[f] for f in [x, y]])
     return out
 
 
@@ -146,7 +151,7 @@ def fuel_consumption_render(request):
 
     pool = Pool(8)
     for trip_key in trip_keys:
-        cached = request.db.trip_summary.find_one({'trip_key': trip_key, 'vid': device_id}, {'_id':0, 'phases': 0})
+        cached = request.db.trip_summary.find_one({'trip_key': trip_key, 'vid': device_id}, {'_id': 0, 'phases': 0})
         if cached is None:
             readings = list(request.db.rpi_readings.find({'trip_key': trip_key}))
             pool.apply_async(trip_dist_fuel, args=(readings, trip_key), callback=merge, error_callback=print)
@@ -168,16 +173,10 @@ def summary_report_do(request):
     excluded = []
 
     def gen_summary_report_for_vehicle(vid):
+        # get all distinct trip_keys for this vehicle
+        trip_keys = list([x.split('_')[2] for x in request.db.rpi_readings.distinct('trip_id', {'vid': vid})])
+        # get all the trip_summary data, if not exists, generate
         report = dict(trips=0, distance=0, time=0, first=datetime(9999, 1, 1), last=datetime(2000, 1, 1))
-        filtered_trips = pluck(request.db.webcan_trip_filters.find({'vid': vid}), 'trip_id')
-        cursor = request.db.rpi_readings.find({
-            'vid': vid,
-            'trip_id': {'$nin': filtered_trips}
-        },
-            {'_id': False}).sort('trip_key', 1)
-        trips = groupby(cursor, lambda x: x['trip_key'])
-
-        pool = Pool()
 
         def merge(trip_info):
             x, trip_id = trip_info
@@ -187,18 +186,37 @@ def summary_report_do(request):
             else:
                 excluded.append(trip_id)
 
-        def on_err(x):
-            print(x)
+        filtered_trips = pluck(request.db.webcan_trip_filters.find({'vid': vid}), 'trip_id')
+        pool = Pool()
+        for trip_key in trip_keys:
+            trip_summary = request.db.trip_summary.find_one({'trip_key': trip_key}, {'_id': 0, 'phases': 0})
 
-        for trip_id, readings in trips:
-            # summarise_trip(trip_id, list(readings), report)
-            lreadings = list(readings)
-            report['first'] = min(lreadings[0]['timestamp'], report['first'])
-            report['last'] = max(lreadings[-1]['timestamp'], report['last'])
-            pool.apply_async(summarise_trip, args=(trip_id, lreadings), callback=merge, error_callback=on_err)
+            if trip_summary is None:
+                cursor = request.db.rpi_readings.find({
+                    'vid': vid,
+                    'trip_id': {'$nin': filtered_trips}
+                }, {'_id': False}).sort('trip_key', 1)
+                trips = groupby(cursor, lambda x: x['trip_key'])
+                print("Doing summary for", trip_key)
+                for trip_id, readings in trips:
+                    # summarise_trip(trip_id, list(readings), report)
+                    lreadings = list(readings)
+                    report['first'] = min(lreadings[0]['timestamp'], report['first'])
+                    report['last'] = max(lreadings[-1]['timestamp'], report['last'])
+                    pool.apply_async(summarise_trip, args=(trip_id, lreadings), callback=merge, error_callback=print)
+            else:
+                # trip summary contains dict(trips=0, distance=0, time=0)
+                report['first'] = min(trip_summary['Start Time'], report['first'])
+                report['last'] = max(trip_summary['Finish Time'], report['last'])
+                # print("Used cached", trip_key)
+                ts = {
+                    'trips': 1,
+                    'distance': trip_summary['Distance (km)'],
+                    'time': trip_summary['Duration (s)']
+                }
+                merge((ts, trip_key))
         pool.close()
         pool.join()
-
         return report
 
     """
