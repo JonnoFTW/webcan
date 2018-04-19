@@ -120,7 +120,7 @@
         };
         var yIdx = columns.indexOf(yf)
         plotData.setColumns([columns.indexOf(xf), yIdx]);
-        var rows = new Array(plotData.getNumberOfRows()-1);
+        var rows = [...Array(plotData.getNumberOfRows()-1)];
 
 
         if(remove0) {
