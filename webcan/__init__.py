@@ -54,14 +54,14 @@ def main(global_config, **settings):
     config.add_route('report_list', '/report')
     config.add_route('report_phase', '/report/phase')
     config.add_route('report_summary', '/report/summary')
-    config.add_route('report_fuel_consumption', '/report/fuel')
-    config.add_route('report_fuel_consumption_all', '/report/fuel_all')
+    config.add_route('report_fuel_consumption_histogram', '/report/fuel')
+    config.add_route('report_trip_summary', '/report/trips_summary')
     config.add_route('report_phase_plot', '/report/phase_plot')
 
     config.add_route('api_upload', '/api/upload')
     config.add_route('fix_pos', '/fix_pos')
     config.add_route('external_reset', '/reset_password')
-    config.add_route('report_phase_for_vehicle', '/report/phase_csv')
+    config.add_route('report_phase_for_vehicle', '/report/_phase_csv')
     config.add_route('changelog', '/changelog')
 
     def add_db(request):

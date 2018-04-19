@@ -1,14 +1,20 @@
 <%inherit file="../layout.mako"/>
 <div class="content">
     <div class="row">
-        <h2>Fuel Consumption Report</h2>
+        <h2>Phase Plots</h2>
         <div class="col-md-12">
             <div class="card">
                 <div class="card-header">
-                    Vehicle Fuel Consumption Report
+                    Vehicle Phase Plots
                 </div>
                 <div class="card-body">
                     <div class="row">
+                        <div class="col-12">
+                            <p>
+                                Select your vehicle(s), phase type(s), x value, y value and a scatter plot will be
+                                generated. You can change x,y axis after loading
+                            </p>
+                        </div>
                         <div class="col-6">
                             <div class="form-group col-12">
                                 <label for="select-vids" class="col-12 col-form-label">Vehicles</label>
@@ -26,6 +32,18 @@
                                     %endfor
                                 </select>
                             </div>
+                            <div class="form-check col-12">
+                                <label class="form-check-label">
+                                    <input class="form-check-input" name="remove-0" id="checkbox-0" type="checkbox"
+                                           value="">
+                                    Remove phases where y=0
+                                </label>
+                                <label class="form-check-label">
+                                    <input class="form-check-input" name="lines-only" id="checkbox-trendsonly"
+                                           type="checkbox" value="">
+                                    Trendlines only (useful for comparing vehicles)
+                                </label>
+                            </div>
                             <div class="form-group col-12" id="load-button">
                                 <button class="btn btn-primary" id="load-phases">Load</button>
                                 <i id="load-icon" class="fa fa-refresh fa-spin fa-fw" style="display:none"></i>
@@ -36,7 +54,11 @@
                                 <label for="select-x" class="col-12 col-form-label">X Axis</label>
                                 <select style="width:500px" id="select-x">
                                     %for d in fields:
-                                        <option value="${d}">${d}</option>
+                                        <option
+                                                %if d=='Duration (s)':
+                                                    selected
+                                                %endif
+                                                value="${d}">${d}</option>
                                     %endfor
                                 </select>
                             </div>
@@ -51,8 +73,15 @@
 
 
                         </div>
-                        <div class="col-12" id="chart_div" style="height: 900px">
+
+                        <div class="col-12" style="height: 900px">
                             ## charts, first one shows accel phases
+                                <!--Div that will hold the dashboard-->
+                            <div id="dashboard_div">
+                                <!--Divs that will hold each control and chart-->
+                                <div id="filter_div"></div>
+                                <div id="chart_div" style="height:500px"></div>
+                            </div>
 
                         </div>
                     </div>
@@ -63,14 +92,25 @@
 </div>
 <script type="text/javascript" src="https://www.gstatic.com/charts/loader.js"></script>
 <script>
-    function drawChart(dataIn, vehicleId, phases) {
-        var data = google.visualization.arrayToDataTable(dataIn);
+    var plotData = null;
+    var columns = null;
+    function drawChart() {
+        if (plotData === null) {
+            return;
+        }
+        plotData.setColumns([]);
+        var xf = $('#select-x').val();
+        var yf = $('#select-y').val();
+        var vehicleId = $('#select-vid').val();
+        var phases = $('#select-phase').val();
+        var remove0 = $('#checkbox-0').is(':checked');
+        var trendlinesOnly = $('#checkbox-trendsonly').is(':checked');
         var title = '{0} vs. {1} for {2}\nphases={3} n={4}'.format(
-                dataIn[0][0], dataIn[0][1], vehicleId, phases, dataIn.length - 1);
+                xf, yf, vehicleId, phases, plotData.getViewRows().length);
         var options = {
             title: title,
-            vAxis: {title: dataIn[0][1]},
-            hAxis: {title: dataIn[0][0]},
+            vAxis: {title: yf},
+            hAxis: {title: xf},
             trendlines: {
                 0: {
                     color: 'red',
@@ -78,33 +118,64 @@
                 }
             }
         };
+        var yIdx = columns.indexOf(yf)
+        plotData.setColumns([columns.indexOf(xf), yIdx]);
+        var rows = new Array(plotData.getNumberOfRows()-1);
+
+
+        if(remove0) {
+            rows = plotData.getFilteredRows([
+                {column: 1, minValue: 0}
+            ]);
+        }
+        plotData.setRows(rows);
         var chart = new google.visualization.ScatterChart(document.getElementById('chart_div'));
-        chart.draw(data, options);
+        chart.draw(plotData, options);
     }
 
     $(document).ready(function () {
 
-        google.charts.load("current", {packages: ["corechart"]});
+        google.charts.load("current", {packages: ["corechart", 'controls']});
+        google.charts.setOnLoadCallback(drawDashboard);
+
+        function drawDashboard() {
+            // Everything is loaded. Assemble your dashboard...
+            // Create a dashboard.
+            var dashboard = new google.visualization.Dashboard(
+                    document.getElementById('dashboard_div'));
+        }
+
         $('select').select2({allowClear: true});
+        $('#select-x,#select-y,#checkbox-0').on('change', function () {
+            drawChart();
+        });
         $('#load-phases').click(function () {
             $('#load-icon').show();
             var $out = $('#output');
             $('.alert').alert('close');
             $out.text('');
             var vehicle_id = $('#select-vid').val();
-            var x = $('#select-x').val();
-            var y = $('#select-y').val();
+
             var phases = $('#select-phase').val();
             $.post('/report/phase_plot',
                     {
                         'vid': [vehicle_id],
-                        'x': x,
-                        'y': y,
-                        'phases': phases
+                        'phases': phases,
                     },
                     function (data) {
-                        drawChart(data, vehicle_id, phases);
-                    }, 'json').fail(function (x) {
+                        var json = JSON.parse(data.replace(/NaN/g, 'null'));
+                        json.forEach(function (row, index, arr) {
+                            if (index === 0)
+                                return;
+                            [3, 4].forEach(function (i) {
+                                arr[index][i] = moment.unix(row[i]['$date'] / 1000).toDate();
+                            });
+                        });
+                        columns = json[0];
+                        plotData = new google.visualization.DataView(
+                                google.visualization.arrayToDataTable(json));
+                        drawChart();
+                    }, 'text').fail(function (x) {
                 console.log(x);
                 $('#load-button').append(
                         '<div class="alert alert-danger" role="alert">\n' +

@@ -1,11 +1,11 @@
 <%inherit file="../layout.mako"/>
 <div class="content">
     <div class="row">
-        <h2>Fuel Consumption Report</h2>
+        <h2> Vehicle Fuel Consumption Histogram Report</h2>
         <div class="col-md-12">
             <div class="card">
                 <div class="card-header">
-                    Vehicle Fuel Consumption Report
+                    Vehicle Fuel Consumption Histogram Report
                 </div>
                 <div class="card-body">
                     <div class="row">

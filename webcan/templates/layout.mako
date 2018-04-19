@@ -154,7 +154,7 @@
     </div>
 </nav>
 <div class="
-% if request.path in ['/report/fuel_all', '/report/phase']:
+% if request.path in ['/report/trips_summary', '/report/phase']:
     container-fluid
 %else:
     container

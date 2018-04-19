@@ -31,7 +31,7 @@ def report_list(request):
     introspector = request.registry.introspector
     reports = set([
         i for i in introspector._categories['routes'].values() if
-        i['pattern'].startswith('/report/') and '{' not in i['pattern']
+        i['pattern'].startswith('/report/') and '{' not in i['pattern'] and '/_' not in i['pattern']
     ])
     return {'reports': reports}
 
@@ -65,7 +65,7 @@ def summarise_trip(trip_id, readings):
     return trip_report, trip_id
 
 
-@view_config(route_name='report_fuel_consumption', request_method='GET', renderer='templates/reports/fuel_report.mako')
+@view_config(route_name='report_fuel_consumption_histogram', request_method='GET', renderer='templates/reports/fuel_report.mako')
 def fuel_consumption(request):
     return {}
 
@@ -79,28 +79,26 @@ def phase_plot(request):
 @view_config(route_name='report_phase_plot', request_method='POST', renderer='bson')
 def phase_plot_render(request):
     # get the requested vehicle/trips from trip_summary
-    trip_keys = request.POST.get('trip_key[]')
     vids = request.POST.getall('vid[]')
     query = {'Distance (km)': {'$gte': 5}, 'phases': {'$exists': True}}
-    if trip_keys:
-        query['trip_key'] = {'$in': trip_keys}
     if vids:
         query['vid'] = {'$in': vids}
-    x = request.POST['x']
-    y = request.POST['y']
+    # x = request.POST['x']
+    # y = request.POST['y']
     phases = request.POST.getall('phases[]')
     print(query)
     print(request.POST)
-    trips = request.db.trip_summary.find(query)
-    out = [[x, y]]
+    trips = list(request.db.trip_summary.find(query))
+    fields = trips[0]['phases'][0].keys()
+    out = [fields]
     for t in trips:
         for phase in t['phases']:
             if phase['phasetype'] in [int(p) for p in phases]:
-                out.append([phase[f] for f in [x, y]])
+                out.append([phase[f] for f in fields])
     return out
 
 
-@view_config(route_name='report_fuel_consumption_all', request_method='GET',
+@view_config(route_name='report_trip_summary', request_method='GET',
              renderer='templates/reports/fuel_consumption_table.mako')
 def fuel_consumption_all(request):
     rows = request.db.trip_summary.find({'vid': {'$in': _get_user_devices_ids(request)}}, {'_id': 0, 'phases': 0})
@@ -121,7 +119,7 @@ def trip_dist_fuel(lreadings, trip_key):
     return dist, fuel_usage, trip_key
 
 
-@view_config(route_name='report_fuel_consumption', request_method='POST', renderer="bson")
+@view_config(route_name='report_fuel_consumption_histogram', request_method='POST', renderer="bson")
 def fuel_consumption_render(request):
     """
     Get the data for all trips of this vehicle longer than given distance

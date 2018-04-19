@@ -64,7 +64,7 @@
 
                             <div class="row" style="margin-top:15px">
                                 <div class="form-group col-12">
-                                    <form action="/report/phase_csv" method="POST" id="load-csv">
+                                    <form action="/report/_phase_csv" method="POST" id="load-csv">
                                         <input type="submit" class="btn btn-primary" value="Export CSV"/>
                                     </form>
                                 </div>
