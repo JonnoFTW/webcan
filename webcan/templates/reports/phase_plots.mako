@@ -113,14 +113,20 @@
             hAxis: {title: xf},
             trendlines: {
                 0: {
+                    type: 'exponential',
                     color: 'red',
+                    visibleInLegend: true
+                },
+                1: {
+                    type: 'exponential',
+                    color: 'green',
                     visibleInLegend: true
                 }
             }
         };
         var yIdx = columns.indexOf(yf)
         plotData.setColumns([columns.indexOf(xf), yIdx]);
-        var rows = [...Array(plotData.getNumberOfRows()-1)];
+        var rows = [...Array(plotData.getNumberOfRows()-1).keys()];
 
 
         if(remove0) {

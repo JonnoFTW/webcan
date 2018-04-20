@@ -51,7 +51,7 @@
             legend: {position: 'none'},
             histogram: {
                  bucketSize: 1,
-                minValue: 0,
+                 minValue: 0,
                  ##  maxValue: 80
              },
             vAxis: {title: 'Count'},
