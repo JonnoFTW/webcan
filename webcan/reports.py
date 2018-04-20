@@ -65,10 +65,10 @@ def summarise_trip(trip_id, readings):
     return trip_report, trip_id
 
 
-@view_config(route_name='report_fuel_consumption_histogram', request_method='GET', renderer='templates/reports/fuel_report.mako')
+@view_config(route_name='report_fuel_consumption_histogram', request_method='GET',
+             renderer='templates/reports/fuel_report.mako')
 def fuel_consumption(request):
     return {}
-
 
 @view_config(route_name='report_phase_plot', request_method='GET', renderer='templates/reports/phase_plots.mako')
 def phase_plot(request):
@@ -168,6 +168,7 @@ def fuel_consumption_render(request):
 @view_config(route_name='report_summary', request_method='POST', renderer='bson')
 def summary_report_do(request):
     min_trip_distance = float(request.POST.get('min_trip_distance', 5))
+    print(min_trip_distance)
     excluded = []
 
     def gen_summary_report_for_vehicle(vid):
@@ -187,7 +188,9 @@ def summary_report_do(request):
         filtered_trips = pluck(request.db.webcan_trip_filters.find({'vid': vid}), 'trip_id')
         pool = Pool()
         for trip_key in trip_keys:
-            trip_summary = request.db.trip_summary.find_one({'trip_key': trip_key}, {'_id': 0, 'phases': 0})
+            trip_summary = request.db.trip_summary.find_one({'trip_key': trip_key,
+                                                             'Distance (km)': {'$gte': min_trip_distance}},
+                                                            {'_id': 0, 'phases': 0})
 
             if trip_summary is None:
                 cursor = request.db.rpi_readings.find({

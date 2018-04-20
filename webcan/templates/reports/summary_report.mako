@@ -61,7 +61,8 @@
             $('.alert').alert('close');
             $out.text('');
             $.post('/report/summary',
-                    {'devices': $('#select-vids').val()},
+                    {'devices': $('#select-vids').val(),
+                    'min-trip-distance': $('#min-trip-distance').val()},
                     function (data) {
                         var $tbl = $('#output');
                         _.forEach(data.summary, function (row, vid) {

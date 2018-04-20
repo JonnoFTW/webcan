@@ -76,7 +76,8 @@
             $out.text('');
             var vehicle_id = $('#select-vid').val();
             $.post('/report/fuel',
-                    {'device': vehicle_id},
+                    {'device': vehicle_id,
+                    'min_trip_distance': $('#min-trip-distance').val()},
                     function (data) {
                         drawChart(data, vehicle_id);
                     }, 'json').fail(function (x) {

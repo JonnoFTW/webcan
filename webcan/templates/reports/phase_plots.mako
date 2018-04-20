@@ -113,9 +113,20 @@
         var vehicleId = $('#select-vid').val();
         var phases = $('#select-phase').val();
         var remove0 = $('#checkbox-0').is(':checked');
+        var rows = [...Array(plotData.getNumberOfRows()-1).keys()];
+
+
+        if(remove0) {
+            rows = plotData.getFilteredRows([
+                {column: 1, test: function(value){
+                    return value >0
+                    }}
+            ]);
+        }
+        plotData.setRows(rows);
         var trendlinesOnly = $('#checkbox-trendsonly').is(':checked');
         var title = '{0} vs. {1} for {2}\nphases={3} n={4}'.format(
-                xf, yf, vehicleId, phases, plotData.getViewRows().length);
+                xf, yf, vehicleId, phases, rows.length);
         var options = {
             title: title,
             vAxis: {title: yf},
@@ -132,21 +143,11 @@
             }
         };
         if (trendlinesOnly) {
-            options.dataOpacity = 0.0;
+            options.pointsVisible = false;
         }
         var yIdx = columns.indexOf(yf)
         plotData.setColumns([columns.indexOf(xf), yIdx]);
-        var rows = [...Array(plotData.getNumberOfRows()-1).keys()];
 
-
-        if(remove0) {
-            rows = plotData.getFilteredRows([
-                {column: 1, test: function(value){
-                    return value >0
-                    }}
-            ]);
-        }
-        plotData.setRows(rows);
         var chart = new google.visualization.ScatterChart(document.getElementById('chart_div'));
         chart.draw(plotData, options);
     }
