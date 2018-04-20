@@ -55,7 +55,7 @@
                                 <select style="width:500px" id="select-x">
                                     %for d in fields:
                                         <option
-                                                %if d=='Duration (s)':
+                                            %if d=='Duration (s)':
                                                     selected
                                                 %endif
                                                 value="${d}">${d}</option>
@@ -68,6 +68,14 @@
                                     %for d in fields:
                                         <option value="${d}">${d}</option>
                                     %endfor
+                                </select>
+                            </div>
+                            <div class="form-group col-12">
+                                <label for="select-trendline" class="col-12 col-form-label">Trendline Type</label>
+                                <select style="width:500px" id="select-trendline">
+                                    <option selected value="linear">Linear</option>
+                                    <option value="exponential">Exponential</option>
+                                    <option value="polynomial">Polynomial</option>
                                 </select>
                             </div>
 
@@ -92,13 +100,14 @@
 </div>
 <script type="text/javascript" src="https://www.gstatic.com/charts/loader.js"></script>
 <script>
-    var plotData = null;
+    var plotDataTable = null;
     var columns = null;
+    var numRows = null;
     function drawChart() {
-        if (plotData === null) {
+        if (plotDataTable === null) {
             return;
         }
-        plotData.setColumns([]);
+        plotData = new google.visualization.DataView(plotDataTable);
         var xf = $('#select-x').val();
         var yf = $('#select-y').val();
         var vehicleId = $('#select-vid').val();
@@ -113,15 +122,11 @@
             hAxis: {title: xf},
             trendlines: {
                 0: {
-                    type: 'exponential',
+                    type: $('#select-trendline').val(),
+                    showR2: true,
                     color: 'red',
                     visibleInLegend: true
                 },
-                1: {
-                    type: 'exponential',
-                    color: 'green',
-                    visibleInLegend: true
-                }
             }
         };
         var yIdx = columns.indexOf(yf)
@@ -131,7 +136,9 @@
 
         if(remove0) {
             rows = plotData.getFilteredRows([
-                {column: 1, minValue: 0}
+                {column: 1, test: function(value){
+                    return value >0
+                    }}
             ]);
         }
         plotData.setRows(rows);
@@ -152,7 +159,7 @@
         }
 
         $('select').select2({allowClear: true});
-        $('#select-x,#select-y,#checkbox-0').on('change', function () {
+        $('#select-x,#select-y,#checkbox-0,#select-trendline').on('change', function () {
             drawChart();
         });
         $('#load-phases').click(function () {
@@ -178,8 +185,8 @@
                             });
                         });
                         columns = json[0];
-                        plotData = new google.visualization.DataView(
-                                google.visualization.arrayToDataTable(json));
+                        numRows = json.length -1;
+                        plotDataTable = google.visualization.arrayToDataTable(json);
                         drawChart();
                     }, 'text').fail(function (x) {
                 console.log(x);

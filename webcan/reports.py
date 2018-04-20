@@ -86,8 +86,8 @@ def phase_plot_render(request):
     # x = request.POST['x']
     # y = request.POST['y']
     phases = request.POST.getall('phases[]')
-    print(query)
-    print(request.POST)
+    # print(query)
+    # print(request.POST)
     trips = list(request.db.trip_summary.find(query))
     fields = trips[0]['phases'][0].keys()
     out = [fields]
