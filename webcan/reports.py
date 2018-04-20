@@ -167,7 +167,7 @@ def fuel_consumption_render(request):
 
 @view_config(route_name='report_summary', request_method='POST', renderer='bson')
 def summary_report_do(request):
-    min_trip_distance = float(request.POST.get('min_trip_distance', 5))
+    min_trip_distance = float(request.POST.get('min-trip-distance', 5))
     print(min_trip_distance)
     excluded = []
 
@@ -188,8 +188,7 @@ def summary_report_do(request):
         filtered_trips = pluck(request.db.webcan_trip_filters.find({'vid': vid}), 'trip_id')
         pool = Pool()
         for trip_key in trip_keys:
-            trip_summary = request.db.trip_summary.find_one({'trip_key': trip_key,
-                                                             'Distance (km)': {'$gte': min_trip_distance}},
+            trip_summary = request.db.trip_summary.find_one({'trip_key': trip_key},
                                                             {'_id': 0, 'phases': 0})
 
             if trip_summary is None:
@@ -207,6 +206,8 @@ def summary_report_do(request):
                     pool.apply_async(summarise_trip, args=(trip_id, lreadings), callback=merge, error_callback=print)
             else:
                 # trip summary contains dict(trips=0, distance=0, time=0)
+                if trip_summary['Distance (km)'] < min_trip_distance:
+                    continue
                 report['first'] = min(trip_summary['Start Time'], report['first'])
                 report['last'] = max(trip_summary['Finish Time'], report['last'])
                 # print("Used cached", trip_key)
