@@ -120,15 +120,20 @@
             title: title,
             vAxis: {title: yf},
             hAxis: {title: xf},
+            dataOpacity: 0.88,
             trendlines: {
                 0: {
                     type: $('#select-trendline').val(),
                     showR2: true,
                     color: 'red',
+                    opacity: 1,
                     visibleInLegend: true
                 },
             }
         };
+        if (trendlinesOnly) {
+            options.dataOpacity = 0.0;
+        }
         var yIdx = columns.indexOf(yf)
         plotData.setColumns([columns.indexOf(xf), yIdx]);
         var rows = [...Array(plotData.getNumberOfRows()-1).keys()];
@@ -159,7 +164,7 @@
         }
 
         $('select').select2({allowClear: true});
-        $('#select-x,#select-y,#checkbox-0,#select-trendline').on('change', function () {
+        $('#select-x,#select-y,#checkbox-0,#select-trendline,#checkbox-trendsonly').on('change', function () {
             drawChart();
         });
         $('#load-phases').click(function () {
