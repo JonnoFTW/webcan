@@ -62,6 +62,12 @@
         };
 
         var chart = new google.visualization.Histogram(document.getElementById('chart_div'));
+        google.visualization.events.addListener(chart, 'select', function() {
+            var selection = chart.getSelection();
+            for (var i = 0; i < selection.length; i++) {
+                console.log(data.getValue(selection[i].row, 0));
+            }
+        });
         chart.draw(data, options);
     }
 

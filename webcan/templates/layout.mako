@@ -44,7 +44,9 @@
             font-family: "Open Sans", "Helvetica Neue", Helvetica, Arial, sans-serif;
             padding-top: 70px;
         }
-
+        #app {
+            margin-bottom: 15px;
+        }
         h1,
         h2,
         h3,

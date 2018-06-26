@@ -1,8 +1,8 @@
 <%inherit file="layout.mako"/>
 <!--suppress ALL -->
-<div class="content">
-    <div class="row">
-        <div class="col-md-12">
+## <div class="content">
+##     <div class="row">
+##         <div class="col-md-12">
             <div class="card" id="app">
                 <div v-if="loading" class="col-12 text-center" style="padding: 15px" id="loader">
                     <i class="fa fa-spinner fa-pulse fa-5x fa-fw"></i>
@@ -39,9 +39,9 @@
                     </table>
                 </div>
             </div>
-        </div>
-    </div>
-</div>
+##         </div>
+##     </div>
+## </div>
 <%
     import json
 %>

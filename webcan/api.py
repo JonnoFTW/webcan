@@ -6,13 +6,15 @@ import gzip
 import dateutil.parser
 from pytz import timezone, utc
 
+tz_local = timezone('Australia/Adelaide')
+tz_utc = utc
+
 
 @view_config(route_name='api_upload', renderer="json")
 def upload_vehicle(request):
     # take in some gzipped data that is base64 encoded
     keys = request.POST.get('keys')
-    tz_local = timezone('Australia/Adelaide')
-    tz_utc = utc
+
     if keys is None:
         return HTTPBadRequest("Please specify the device keys")
     keys = keys.split(",")
@@ -82,3 +84,5 @@ def upload_vehicle(request):
     return {
         'inserted': len(res.inserted_ids)
     }
+
+

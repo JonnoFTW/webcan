@@ -1,24 +1,42 @@
 import pytz
-import tabulate
 import configparser
 from multiprocessing import Pool
 import tqdm
 from bson import CodecOptions
 from geopy.distance import vincenty
-from pymongo import MongoClient
+from pymongo import MongoClient, ASCENDING
 from pluck import pluck
-from itertools import groupby
+
+from webcan.reports import _classify_readings_with_phases_pas, per_phase_report
 from webcan.utils import calc_extra
 import numpy as np
+np.seterr(all='raise')
 
+def phase_and_summary_report(trip_key, vid, uri):
+    conn = MongoClient(uri)['webcan']
+    readings_col = conn.rpi_readings.with_options(
+        codec_options=CodecOptions(tz_aware=True, tzinfo=pytz.timezone('Australia/Adelaide')))
+    try:
+        readings = list(readings_col.find({'trip_key': trip_key, 'vid': vid}))
+        readings.sort(key=lambda x:x['trip_sequence'])
+        prev = None
+        for p in readings:
+            p.update(calc_extra(p, prev))
+            prev = p
 
-def fuel_report_trip(trip_id, p):
-    report = {'trip_key': trip_id}
-    prev = None
-    p.sort(key=lambda x: x['trip_sequence'])
-    for r in p:
-        r.update(calc_extra(r, prev))
-        prev = r
+        _classify_readings_with_phases_pas(readings, 3, 1)
+        phase_report = per_phase_report(readings)
+    except Exception as e:
+        raise Exception(f"Error reporting {vid}:{trip_key} {e}")
+    for pr in phase_report:
+        for k, v in pr.items():
+            pr[k] = parse(v)
+    summary = {
+        'trip_key': trip_key,
+        'vid': readings[0]['vid'],
+        'phases': phase_report
+    }
+    p = readings
     fms_spd = 'FMS_CRUISE_CONTROL_VEHICLE_SPEED (km/h)'
     gps_spd = 'spd_over_grnd'
     duration = (p[-1]['timestamp'] - p[0]['timestamp']).total_seconds()
@@ -37,7 +55,7 @@ def fuel_report_trip(trip_id, p):
         if gps_spd in r and '_duration' in r and r[gps_spd] < 2:
             idle_time += r['_duration']
     energy = np.array(pluck(p, 'Total Energy (kWh)', default=0))
-    report.update({
+    summary.update({
         'vid': p[0]['vid'],
         'Start Time': p[0]['timestamp'],
         'Finish Time': p[-1]['timestamp'],
@@ -64,7 +82,7 @@ def fuel_report_trip(trip_id, p):
         'Total Energy (kWh)': energy.sum(),
         '% Idle': idle_time / duration * 100
     })
-    return report
+    return summary
 
 
 def parse(val):
@@ -80,59 +98,31 @@ def main():
     uri = conf['app:webcan']['mongo_uri']
 
     conn = MongoClient(uri)['webcan']
-    filtered_trips = pluck(conn.webcan_trip_filters.find(), 'trip_id')
-    # vid_re = 'rocco_phev'
-    vid_re = '^adl_metro'
-    num_trips = len(set(x.split('_')[2] for x in
-                        conn.rpi_readings.distinct('trip_id', {'vid': {'$regex': vid_re}}))
-                    - set(x.split('_')[2] for x in filtered_trips))
-    # generate a fuel consumption report
-    query = {
-        # 'vid': vid_re,
-        'vid': {'$regex': vid_re},
-    }
-    if filtered_trips:
-        query['trip_id'] = {'$nin': filtered_trips}
-    readings = conn.rpi_readings.with_options(
-        codec_options=CodecOptions(tz_aware=True, tzinfo=pytz.timezone('Australia/Adelaide')))
-    cursor = readings.find(query).sort([('trip_key', 1)])
-    report = []
+    done_trips = conn.trip_summary.distinct('trip_key')
+    # get all those trip keys from rpi_readings that are not in done_trips and match the vid matches ^adl_metro
+    trip_keys = conn.rpi_readings.distinct('trip_key',
+                                           {'trip_key': {'$nin': done_trips}, 'vid': {'$regex': '^adl_metro'}})
 
-    prog = tqdm.tqdm(desc='Trip Reports: ', total=num_trips, unit=' trips')
+    prog = tqdm.tqdm(trip_keys, desc='Trip Reports: ', unit=' trips')
 
     def on_complete(r):
         # put this in the db
         # print(r)
         conn.trip_summary.insert_one({k: parse(v) for k, v in r.items()})
-        if r['Distance (km)'] >= 10:
-            report.append(r)
         prog.update()
-
-    def summary_exists(trip_key):
-        return conn.trip_summary.find_one({'trip_key': trip_key}) is not None
 
     pool = Pool()
     i = 0
 
-    for trip_id, readings in groupby(cursor, key=lambda x: x['trip_key']):
-
-        if summary_exists(trip_id):
-            continue
-        readings = list(readings)
-        # on_complete(fuel_report_trip(trip_id, readings))
-        pool.apply_async(fuel_report_trip, args=(trip_id, readings), callback=on_complete)
+    for trip_key in trip_keys:
+        vid = conn.rpi_readings.find_one({'trip_key': trip_key})['vid']
+        # on_complete(phase_and_summary_report(trip_key, vid, uri))
+        pool.apply_async(phase_and_summary_report, args=(trip_key, vid, uri), callback=on_complete, error_callback=print)
         i += 1
 
     pool.close()
     pool.join()
     prog.close()
-    print(tabulate.tabulate(report, headers='keys'))
-    exit()
-    import csv
-    with open('adl_metro_report_phev.csv', 'w') as out:
-        writer = csv.DictWriter(out, fieldnames=list(report[0].keys()))
-        writer.writeheader()
-        writer.writerows(report)
 
 
 if __name__ == "__main__":
