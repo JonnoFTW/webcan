@@ -56,7 +56,7 @@ def calc_extra(i, previous):
         if i.get('FMS_FUEL_ECONOMY (L/h)'):
             fuel_use = i['FMS_FUEL_ECONOMY (L/h)'] * time_diff / 3600  # use in L
             out['Petrol Used (ml)'] = fuel_use * 1000
-            gj_used = fuel_use / 1000000 * gj_per_kl_of_euro_iv
+            gj_used = fuel_use / 1000 * gj_per_kl_of_euro_iv
             out['Petrol CO2e (g)'] = fuel_use * 1000 * kg_co2e_per_ml_euro_iv * 1000
             # out['Petrol CO2e (g)'] = (np.array(
             #     [co2_per_gj_diesel, ch4_per_gj_diesel, n2o_per_gj_diesel]) * gj_used).sum() * 1000
