@@ -26,6 +26,7 @@ co2_per_gj_diesel = 69.9
 ch4_per_gj_diesel = 0.06
 n2o_per_gj_diesel = 0.5
 
+kg_co2e_per_ml_euro_iv = 0.00271953
 
 def calc_extra(i, previous):
     """
@@ -56,8 +57,9 @@ def calc_extra(i, previous):
             fuel_use = i['FMS_FUEL_ECONOMY (L/h)'] * time_diff / 3600  # use in L
             out['Petrol Used (ml)'] = fuel_use * 1000
             gj_used = fuel_use / 1000000 * gj_per_kl_of_euro_iv
-            out['Petrol CO2e (g)'] = (np.array(
-                [co2_per_gj_diesel, ch4_per_gj_diesel, n2o_per_gj_diesel]) * gj_used).sum() * 1000
+            out['Petrol CO2e (g)'] = fuel_use * 1000 * kg_co2e_per_ml_euro_iv * 1000
+            # out['Petrol CO2e (g)'] = (np.array(
+            #     [co2_per_gj_diesel, ch4_per_gj_diesel, n2o_per_gj_diesel]) * gj_used).sum() * 1000
             out['Petrol cost (c)'] = fuel_use * diesel_cents_per_litre
             out['P Used (kWh)'] = gj_used * gj_to_kwh
         if i.get('Battery Voltage (V)'):
