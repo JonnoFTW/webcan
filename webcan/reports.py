@@ -337,7 +337,14 @@ def phase_classify_csv_render(request):
         request=request,
         response=request.response
     )
-
+@view_config(route_name='fuel_consumption_csv', renderer='csv')
+def export_trip_summary_csv(request):
+    # get the trip summaries for which the user can view
+    rows = list(request.db.trip_summary.find({'vid': {'$in': _get_user_devices_ids(request)}}, {'phases': 0, '_id': 0}))
+    return {
+        'header': rows[0].keys(),
+        'rows': rows,
+    }
 
 def per_phase_report(readings, min_duration=5):
     """
@@ -359,7 +366,7 @@ def per_phase_report(readings, min_duration=5):
             continue
         speeds = pluck(p, 'speed')
         fuel_rates = np.array(pluck(p, 'FMS_FUEL_ECONOMY (L/h)', default=0)) / 1000
-        durations = np.array(pluck(p, '_duration', default=0)) / 3600
+        durations = np.array(pluck(p, '_duration', default=1e-9)) / 3600
         fuels = fuel_rates * durations  # should be in ml
 
         if not any(fuel_rates):

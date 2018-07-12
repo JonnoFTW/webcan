@@ -108,10 +108,13 @@ def main():
     def on_complete(r):
         # put this in the db
         # print(r)
-        conn.trip_summary.insert_one({k: parse(v) for k, v in r.items()})
+        try:
+            conn.trip_summary.insert_one({k: parse(v) for k, v in r.items()})
+        except Exception  as e:
+            print("Failed to upload trip {}: {}".format(r['trip_key'], e))
         prog.update()
 
-    pool = Pool()
+    pool = Pool(2)
     i = 0
 
     for trip_key in trip_keys:

@@ -28,6 +28,7 @@ n2o_per_gj_diesel = 0.5
 
 kg_co2e_per_ml_euro_iv = 0.00271953
 
+
 def calc_extra(i, previous):
     """
     Given an instantaneous reading, return the extra fields

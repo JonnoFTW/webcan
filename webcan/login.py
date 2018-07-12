@@ -17,7 +17,7 @@ def check_logged_in(event):
         req.environ['REMOTE_USER'] = req.authenticated_userid
     except:
         pass
-    if req.path in ('/login', '/logout', '/api/upload', '/reset_password'):
+    if req.path in ('/login', '/logout', '/api/upload', '/reset_password', '/shuttle', '/api/shuttle'):
         return
     if not req.user:
         if req.is_xhr:

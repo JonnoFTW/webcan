@@ -29,7 +29,7 @@ def main(global_config, **settings):
 
     config = Configurator(settings=settings)
     config.include('pyramid_mako')
-    config.add_static_view('static', 'webcan:static', cache_max_age=3600)
+    config.add_static_view('static', 'static', cache_max_age=3600)
     config.add_route('home', '/')
     config.add_route('login', '/login')
     config.add_route('logout', '/logout')
@@ -56,9 +56,12 @@ def main(global_config, **settings):
     config.add_route('report_summary', '/report/summary')
     config.add_route('report_fuel_consumption_histogram', '/report/fuel')
     config.add_route('report_trip_summary', '/report/trips_summary')
+    config.add_route('fuel_consumption_csv', '/report/trips_summary/export')
     config.add_route('report_phase_plot', '/report/phase_plot')
 
     config.add_route('api_upload', '/api/upload')
+    config.add_route('api_shuttle', '/api/shuttle')
+    config.add_route('shuttle', '/shuttle')
     config.add_route('fix_pos', '/fix_pos')
     config.add_route('external_reset', '/reset_password')
     config.add_route('report_phase_for_vehicle', '/report/_phase_csv')
