@@ -70,6 +70,7 @@ def summarise_trip(trip_id, readings):
 def fuel_consumption(request):
     return {}
 
+
 @view_config(route_name='report_phase_plot', request_method='GET', renderer='templates/reports/phase_plots.mako')
 def phase_plot(request):
     fields = request.db.trip_summary.find_one({'$where': 'this.phases.length>0'})['phases'][0].keys()
@@ -337,14 +338,24 @@ def phase_classify_csv_render(request):
         request=request,
         response=request.response
     )
-@view_config(route_name='fuel_consumption_csv', renderer='csv')
+
+
+@view_config(route_name='trip_summary_csv', renderer='csv')
 def export_trip_summary_csv(request):
     # get the trip summaries for which the user can view
     rows = list(request.db.trip_summary.find({'vid': {'$in': _get_user_devices_ids(request)}}, {'phases': 0, '_id': 0}))
-    return {
-        'header': rows[0].keys(),
-        'rows': rows,
-    }
+    request.response.content_disposition = 'attachment;filename=trip_summary_{}.csv'.format(
+        datetime.now().strftime('%Y%m%d_%H%M%S'))
+    return render_to_response(
+        renderer_name='csv',
+        value={
+            'header': rows[0].keys(),
+            'rows': rows,
+        },
+        request=request,
+        response=request.response
+    )
+
 
 def per_phase_report(readings, min_duration=5):
     """

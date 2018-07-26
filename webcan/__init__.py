@@ -56,7 +56,7 @@ def main(global_config, **settings):
     config.add_route('report_summary', '/report/summary')
     config.add_route('report_fuel_consumption_histogram', '/report/fuel')
     config.add_route('report_trip_summary', '/report/trips_summary')
-    config.add_route('fuel_consumption_csv', '/report/trips_summary/export')
+    config.add_route('trip_summary_csv', '/report/trips_summary/export')
     config.add_route('report_phase_plot', '/report/phase_plot')
 
     config.add_route('api_upload', '/api/upload')

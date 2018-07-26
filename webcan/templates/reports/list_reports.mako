@@ -10,7 +10,7 @@
                 <div class="card-body">
                     <div class="row">
                         <ul>
-                            %for r in reports:
+                            %for r in sorted(reports, key=lambda x:x['name']):
                                 <li><a href="${r['pattern']}">${r['name'].replace('_',' ').title()}</a></li>
                             %endfor
                         </ul>
