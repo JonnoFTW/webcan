@@ -1,3 +1,5 @@
+from email_validator import validate_email, EmailNotValidError
+
 from .errors import AJAXHttpBadRequest
 from .views import USER_LEVELS, LOGIN_TYPES
 from email.message import EmailMessage
@@ -27,13 +29,20 @@ def user_add(request):
     new_fan = request.POST.get('name')
     level = request.POST.get('level')
     login_type = request.POST.get('login')
-    if new_fan is None or re.findall(r"^[\w_]+$", new_fan) == []:
-        return AJAXHttpBadRequest("Username must only contain underscores, letters and numbers")
-    if level not in USER_LEVELS:
-        return AJAXHttpBadRequest("User level must be admin or viewers")
     if login_type not in LOGIN_TYPES:
         return AJAXHttpBadRequest("Login type must be ldap or external", )
-    if not new_fan or request.db.webcan_users.find_one({'username': new_fan}) is not None:
+    if login_type == 'ldap':
+        if not re.findall(r"\[a-z]{1,4}\d{4}", new_fan):
+            return AJAXHttpBadRequest("Must be a valid FAN")
+    elif login_type == 'external':
+        try:
+            new_fan = validate_email(new_fan)['email']
+        except EmailNotValidError:
+            raise AJAXHttpBadRequest("Invalid email address")
+    if level not in USER_LEVELS:
+        return AJAXHttpBadRequest("User level must be admin or viewers")
+
+    if request.db.webcan_users.find_one({'username': new_fan}) is not None:
         return AJAXHttpBadRequest('Empty or existing usernames cannot be used again')
 
     new_user_obj = {
@@ -44,9 +53,11 @@ def user_add(request):
         'level': level
     }
     if login_type == 'external':
+        new_user_obj['email'] = new_fan
         password = secrets.token_hex(32)
         new_user_obj['password'] = bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
         new_user_obj['reset_password'] = secrets.token_urlsafe(16)
+
     request.db.webcan_users.insert_one(new_user_obj)
     return new_user_obj
 
@@ -58,6 +69,16 @@ def user_manage(request):
         raise exc.HTTPForbidden("You can only view your own user page")
     else:
         return request.db.webcan_users.find_one({'username': user_id})
+
+
+@view_config(route_name='user_update', renderer='bson', request_method='POST')
+def user_update(request):
+    if request.user['level'] != 'admin':
+        raise exc.HTTPForbidden("You can't do that")
+    res = request.db.webcan_users.update_one({'username': request.POST['username']}, {'$set': {
+        'devices': request.POST.getall('devices[]')
+    }})
+    return res.raw_result
 
 
 @view_config(route_name='reset_user_password', renderer='bson')

@@ -43,6 +43,7 @@ def main(global_config, **settings):
     config.add_route('user_list', '/users')
     config.add_route('user_manage', '/users/v/{user_id}')
     config.add_route('user_add', '/users/add')
+    config.add_route('user_update', '/users/update')
     config.add_route('reset_user_password', '/users/reset/{user_id}')
 
     config.add_route('trip_csv', '/trip/{trip_id}.csv')

@@ -3,42 +3,43 @@
 ## <div class="content">
 ##     <div class="row">
 ##         <div class="col-md-12">
-            <div class="card" id="app">
-                <div v-if="loading" class="col-12 text-center" style="padding: 15px" id="loader">
-                    <i class="fa fa-spinner fa-pulse fa-5x fa-fw"></i>
-                    <span class="sr-only">Loading...</span>
-                </div>
-                <div id="content" style="display:none">
+
+<div class="card" id="app">
+    <div v-if="loading" class="col-12 text-center" style="padding: 15px" id="loader">
+        <i class="fa fa-spinner fa-pulse fa-5x fa-fw"></i>
+        <span class="sr-only">Loading...</span>
+    </div>
+    <div id="content" style="display:none">
 
 
-                    <div class="card-header">
-                        Manage Users
-                        <form class="form-inline" id="new-user">
-                            <input class="form-control col-md-2 mr-sm-2" v-model="newuser.name" name="new-fan"
-                                   id="fan-input"
-                                   placeholder="Username/FAN"/>
-                            <v-select :options="login" :placeholder="'Login'" v-model="newuser.login"
-                                      :name="'new-login'"></v-select>
-                            <v-select :options="levels" :placeholder="'Level'" v-model="newuser.level"
-                                      :name="'new-level'"></v-select>
-                            <button type="button" id="submit" @click="add_user" class="btn btn-primary">Add</button>
-                            <div class="alert alert-danger" v-if="newerrorvisible" role="alert">
-                                <strong>Error</strong> {{newerror}}
-                            </div>
-                        </form>
-                    </div>
-                    <table class="table">
-                        <thead>
-                        <tr>
-                            <th v-for="f in tfields">{{f}}</th>
-                        </tr>
-                        </thead>
-                        <tbody id="tbody">
-                        <tr is="user-component" :user="user" v-for="user in users" :key="user.username"></tr>
-                        </tbody>
-                    </table>
+        <div class="card-header">
+            Manage Users
+            <form class="form-inline" id="new-user">
+                <input class="form-control col-md-2 mr-sm-2" v-model="newuser.name" name="new-fan"
+                       id="fan-input"
+                       placeholder="Username/FAN"/>
+                <v-select :options="login" :placeholder="'Login'" v-model="newuser.login"
+                          :name="'new-login'"></v-select>
+                <v-select :options="levels" :placeholder="'Level'" v-model="newuser.level"
+                          :name="'new-level'"></v-select>
+                <button type="button" id="submit" @click="add_user" class="btn btn-primary">Add</button>
+                <div class="alert alert-danger" v-if="newerrorvisible" role="alert">
+                    <strong>Error</strong> {{newerror}}
                 </div>
-            </div>
+            </form>
+        </div>
+        <table class="table">
+            <thead>
+            <tr>
+                <th v-for="f in tfields">{{f}}</th>
+            </tr>
+            </thead>
+            <tbody id="tbody">
+            <tr is="user-component" :user="user" v-for="user in users" :key="user.username"></tr>
+            </tbody>
+        </table>
+    </div>
+</div>
 ##         </div>
 ##     </div>
 ## </div>
@@ -84,10 +85,10 @@
                 watch: {
                     user: {
                         handler: function (newValue, oldValue) {
-                            console.log(newValue.username + " modified")
-                            console.log("New",newValue);
-                            console.log("Old",oldValue);
-
+                            ##  console.log(newValue.username + " modified")
+                            ##  console.log("New", newValue.devices);
+                            ##  console.log("Old", oldValue.devices);
+                            this.update_user(newValue);
                         },
                         deep: true
                     }
@@ -99,6 +100,10 @@
                             console.log(response);
                         });
                     },
+                    update_user: function (user_obj) {
+                        console.log("Updating user", user_obj);
+                         this.$http.post('/users/update', user_obj, {emulateJSON: true});
+                    }
                 }
             });
     var app = new Vue({
@@ -120,7 +125,7 @@
                 $('#content').show(500);
                 this.loading = false;
             });
-            this.devices = ${json.dumps(devices)|n};
+            this.devices = ${json.dumps([x['name'] for x in devices])|n};
             var allDev = {'name': 'ALL DEVICES', 'value': '*'};
             this.devices.unshift(allDev);
             this.users = ${json.dumps(users)|n};
@@ -151,7 +156,7 @@
                             this.newerror = response.body.message;
                             this.newerrorvisible = true;
                         });
-            },
+            }
         }
     });
 </script>

@@ -17,3 +17,4 @@ geopy
 request-id
 #git+https://github.com/Supervisor/supervisor.git
 git+https://github.com/lokkju/pyspatialite.git
+email_validator
