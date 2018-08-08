@@ -12,7 +12,7 @@
                         <div class="col-6">
                             <div class="form-group col-12">
                                 <label for="select-vids" class="col-12 col-form-label">Vehicles</label>
-                                <select style="width:500px" id="select-vid">
+                                <select style="width:500px" id="select-vid" multiple>
                                     %for d in devices:
                                         <option value="${d['name']}">${d['name']}</option>
                                     %endfor
@@ -34,6 +34,9 @@
 ## Basically just need to json in the fuel consumption of every trip we have, bin width  1
 
                         </div>
+                        <div class="col-12" id="selected-info">
+
+                        </div>
                     </div>
                 </div>
             </div>
@@ -42,18 +45,27 @@
 </div>
 <script type="text/javascript" src="https://www.gstatic.com/charts/loader.js"></script>
 <script>
-    function drawChart(dataIn, vehicleId) {
+    function drawChart(dataIn) {
         var data = google.visualization.arrayToDataTable(dataIn['table']);
-        var title = 'Histogram of Fuel Economy (L/100km) for {0}\nn={1}, std={2} mean={3}'.format(
-            vehicleId, dataIn['table'].length - 1, dataIn['std'], dataIn['mean']);
+        var title = 'Histogram of Fuel Economy (L/100km)\n';
+        _.each(dataIn, function(val, key) {
+            if (key !== 'table')
+                title +="{0}: n={1}, std={2} mean={3}\n".format(
+                    key, val['n'], val['std'], val['mean']);
+        });
+        ##  data.addColumn({'type': 'string', 'role': 'tooltip', 'p': {'html': true}});
+
         var options = {
             title: title,
-            legend: {position: 'none'},
+            interpolateNulls: false,
+            ##  legend: {position: 'none'},
             histogram: {
                  bucketSize: 1,
                  minValue: 0,
+                 hideBucketItems: false
                  ##  maxValue: 80
              },
+            ##  isStacked: true,
             vAxis: {title: 'Count'},
             hAxis: {
                 title: 'L/100km',
@@ -63,11 +75,29 @@
 
         var chart = new google.visualization.Histogram(document.getElementById('chart_div'));
         google.visualization.events.addListener(chart, 'select', function() {
-            var selection = chart.getSelection();
-            for (var i = 0; i < selection.length; i++) {
-                console.log(data.getValue(selection[i].row, 0));
-            }
+             var selection = chart.getSelection();
+             ##  console.log(selection);
+             for (var i = 0; i < selection.length; i++) {
+                 console.log(data.getValue(selection[i].row, selection[i].column));
+                 var col_lbl = data.getColumnLabel(selection[i].column)
+                 var trip_key = dataIn['labels'][col_lbl][selection[i].row];
+                console.log(col_lbl, trip_key);
+                $.getJSON('/report/trip_summary_info/{}'.format(trip_key), function(d) {
+                    var html = '<b>Vehicle:</b> <a href="/dev/{0}">{0}</a><br><b>Trip Key:</b> <a href="/dev/{0}?key={1}">{1}</a><br>'.format(col_lbl, trip_key);
+                    _.each(d, function(val, key) {
+                        if(_.isObject(val)) {
+                            val = moment.unix(val.$date/1000).format();
+                        }
+                       html += "<b>{0}:</b> {1}<br>".format(key, val);
+                    });
+                    $('#selected-info').html(html);
+                });
+
+             }
         });
+        ##  google.visualization.events.addListener(chart, 'onmouseover', function(rc) {
+        ##      console.log(data.getValue(rc.row, rc.column-1));
+        ##  });
         chart.draw(data, options);
     }
 

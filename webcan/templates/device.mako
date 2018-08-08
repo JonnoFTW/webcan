@@ -11,7 +11,11 @@
                         <div class="input-group mb-3 mr-sm-2 mb-sm-0">
                             <select class="form-control" id="select-trip">
                                 %for t in trips:
-                                    <option value="${t}">${t}</option>
+                                    <option value="${t}"
+                                            %if request.GET.get('key') and request.GET['key'] in t:
+                                                selected
+                                            %endif
+                                    >${t}</option>
                                 %endfor
                             </select>
                         </div>

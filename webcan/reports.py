@@ -1,3 +1,4 @@
+import json
 from datetime import datetime
 import pytz
 from pyramid.renderers import render_to_response, get_renderer
@@ -13,7 +14,7 @@ from pluck import pluck
 import numpy as np
 import pymongo
 from webob import exc
-from itertools import groupby
+from itertools import groupby, zip_longest
 from scipy import stats
 from multiprocessing import Pool
 
@@ -102,8 +103,14 @@ def phase_plot_render(request):
 @view_config(route_name='report_trip_summary', request_method='GET',
              renderer='templates/reports/fuel_consumption_table.mako')
 def fuel_consumption_all(request):
-    rows = request.db.trip_summary.find({'vid': {'$in': _get_user_devices_ids(request)}}, {'_id': 0, 'phases': 0})
-    return {'rows': rows}
+    row = request.db.trip_summary.find_one({'vid': {'$in': _get_user_devices_ids(request)}}, {'_id': 0, 'phases': 0})
+    return {'row': row, 'json': json}
+
+
+@view_config(route_name='trip_summary_json', request_method='GET', renderer='bson')
+def trip_summary_json(request):
+    return {
+        'data': request.db.trip_summary.find({'vid': {'$in': _get_user_devices_ids(request)}}, {'_id': 0, 'phases': 0})}
 
 
 def trip_dist_fuel(lreadings, trip_key):
@@ -131,39 +138,56 @@ def fuel_consumption_render(request):
     """
 
     min_trip_distance = float(request.POST.get('min_trip_distance', 5))
-    excluded = []
-    device_id = request.POST.get('device')
-    out = [['Trip Key', 'Fuel Usage']]
-    trip_keys = list(set([x.split('_')[2] for x in request.db.rpi_readings.distinct('trip_id', {'vid': device_id})]))
+    device_ids = request.POST.getall('device[]')
 
-    def merge(res):
+    out = [device_ids]
+    tables = defaultdict(list)
+    labels = defaultdict(list)
+
+    def merge(res, dev_id):
         dist, fuel_usage, trip_key = res
         fuel_litres = fuel_usage * 0.001
         dist_100km = dist / 100.
         fuel_usage_rate_per_100km = fuel_litres / dist_100km
         suffix = "{} {}km {} mL {} L/100km".format(trip_key, dist, fuel_usage, fuel_usage_rate_per_100km)
         if dist >= min_trip_distance:
-            out.append([trip_key, fuel_usage_rate_per_100km])
+            tables[dev_id].append(fuel_usage_rate_per_100km)
+            labels[dev_id].append(trip_key)
+            # out.append([trip_key, fuel_usage_rate_per_100km])
             # print("Accepted", suffix)
         # else:
         #     print("Rejected", suffix)
 
-    pool = Pool(8)
-    for trip_key in trip_keys:
-        cached = request.db.trip_summary.find_one({'trip_key': trip_key, 'vid': device_id}, {'_id': 0, 'phases': 0})
-        if cached is None:
-            readings = list(request.db.rpi_readings.find({'trip_key': trip_key}))
-            pool.apply_async(trip_dist_fuel, args=(readings, trip_key), callback=merge, error_callback=print)
-        else:
-            merge((cached[f] for f in ('Distance (km)', 'Total Fuel (ml)', 'trip_key')))
-    pool.close()
-    pool.join()
-    fuel_usages = np.array(out[1:])[:, 1].astype(np.float)
-    return {
-        'table': out,
-        'std': round(np.std(fuel_usages), 2),
-        'mean': round(np.mean(fuel_usages), 2)
-    }
+    data = {}
+
+    for device_id in device_ids:
+        out = [device_ids]
+        ignored = list(x['trip_id'].split('_')[2] for x in request.db.webcan_trip_filters.find({'vid': device_id}))
+        for trip_summary in request.db.trip_summary.find({'vid': device_id, 'trip_key': {'$nin': ignored}},
+                                                         {'_id': 0, 'phases': 0}):
+            # if cached is None:
+            #     skipped.append(trip_key)
+            #
+            #     # readings = list(request.db.rpi_readings.find({'trip_key': trip_key}))
+            #     # pool.apply_async(trip_dist_fuel, args=(readings, trip_key), callback=merge, error_callback=print)
+            # else:
+            merge((trip_summary[f] for f in ('Distance (km)', 'Total Fuel (ml)', 'trip_key')), device_id)
+        fuel_usages = np.array(tables[device_id]).astype(np.float)
+        data[device_id] = {
+            'n': fuel_usages.size,
+            'std': round(np.std(fuel_usages), 2),
+            'mean': round(np.mean(fuel_usages), 2)
+        }
+    out.extend(zip_longest(*(tables[x] for x in device_ids)))
+    data['table'] = out
+    data['labels'] = labels
+    return data
+
+
+@view_config(route_name='trip_summary_info', request_method='GET', renderer='bson')
+def trip_summary_info(request):
+    trip_key = request.matchdict['trip_key']
+    return request.db.trip_summary.find_one({'trip_key': trip_key}, {'phases': 0, '_id': 0, 'trip_key': 0})
 
 
 @view_config(route_name='report_summary', request_method='POST', renderer='bson')
