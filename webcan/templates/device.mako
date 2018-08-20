@@ -106,7 +106,7 @@
         var title = _.join(fields_using, ', ');
         var options = {
             title: title + ' vs. Time',
-            curveType: 'function',
+            curveType: 'none',
             animation: {
                 duration: 100,
                 startup: true

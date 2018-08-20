@@ -121,8 +121,9 @@
                     'min_trip_distance': $('#min-trip-distance').val()},
                     function (data) {
                         drawChart(data, vehicle_id);
-                    }, 'json').fail(function (x) {
-                console.log(x);
+                    }, 'json').
+            fail(function (x, text, err) {
+                console.log(x, text, err);
                 $('#load-button').append(
                         '<div class="alert alert-danger" role="alert">\n' +
                         '  <strong>Error</strong> {}'.format(x.statusText) +

@@ -135,7 +135,7 @@ def trip_dist_fuel(lreadings, trip_key):
     return dist, fuel_usage, trip_key
 
 
-@view_config(route_name='report_fuel_consumption_histogram', request_method='POST', renderer="bson")
+@view_config(route_name='report_fuel_consumption_histogram', request_method='POST', renderer="json")
 def fuel_consumption_render(request):
     """
     Get the data for all trips of this vehicle longer than given distance
@@ -157,7 +157,7 @@ def fuel_consumption_render(request):
         fuel_litres = fuel_usage * 0.001
         dist_100km = dist / 100.
         fuel_usage_rate_per_100km = fuel_litres / dist_100km
-        suffix = "{} {}km {} mL {} L/100km".format(trip_key, dist, fuel_usage, fuel_usage_rate_per_100km)
+        # suffix = "{} {}km {} mL {} L/100km".format(trip_key, dist, fuel_usage, fuel_usage_rate_per_100km)
         # if dist >= min_trip_distance:
         tables[dev_id].append(fuel_usage_rate_per_100km)
         labels[dev_id].append(trip_key)
@@ -187,8 +187,8 @@ def fuel_consumption_render(request):
         fuel_usages = np.array(tables[device_id]).astype(np.float)
         data[device_id] = {
             'n': fuel_usages.size,
-            'std': round(np.std(fuel_usages), 2),
-            'mean': round(np.mean(fuel_usages), 2)
+            'std': str(round(np.std(fuel_usages), 2)),
+            'mean': str(round(np.mean(fuel_usages), 2))
         }
     out.extend(zip_longest(*(tables[x] for x in device_ids)))
     data['table'] = out

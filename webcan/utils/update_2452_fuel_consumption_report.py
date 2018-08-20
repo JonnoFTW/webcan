@@ -20,18 +20,32 @@ def main():
      total co2e
     """
     trip_keys = list(conn.trip_summary.distinct('trip_key', {'vid': 'adl_metro_2452'}))
+    fuel_name = 'FMS_FUEL_CONSUMPTION (L)'
     for trip_key in tqdm.tqdm(trip_keys, desc='Trip Reports: ', unit=' trips'):
-        fr = conn.rpi_readings.find_one({
+        readings = conn.rpi_readings.find({
             'trip_key': trip_key,
-            'FMS_FUEL_CONSUMPTION (L)': {'$exists': True}
+            fuel_name: {'$exists': True}
         }, sort=[('trip_sequence', ASCENDING)])
+        # get the first 2 distinct fuel consumption readings
+        # get the diff, if, it's more than than 0.5, use the 2nd reading
+
+        first_fuel = next(readings)
+        other_fuel = None
+        for i in readings:
+            other_fuel = i
+            if other_fuel[fuel_name] != first_fuel[fuel_name]:
+                break
+        if (other_fuel[fuel_name] - first_fuel[fuel_name]) > 0.5:
+            fr = other_fuel
+        else:
+            fr = first_fuel
 
         lr = conn.rpi_readings.find_one({
             'trip_key': trip_key,
-            'FMS_FUEL_CONSUMPTION (L)': {'$exists': True}
+            fuel_name: {'$exists': True}
         }, sort=[('trip_sequence', DESCENDING)])
 
-        total_fuel_used_litres = lr['FMS_FUEL_CONSUMPTION (L)'] - fr['FMS_FUEL_CONSUMPTION (L)']
+        total_fuel_used_litres = lr[fuel_name] - fr[fuel_name]
         duration_seconds = (lr['timestamp'] - fr['timestamp']).total_seconds()
         duration_hours = duration_seconds / 3600.0
         # print(f"FUEL Used (L) {total_fuel_used_litres} Duration (s) {duration_seconds}")
