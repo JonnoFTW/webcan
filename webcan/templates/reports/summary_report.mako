@@ -31,12 +31,14 @@
                         <div class="col-12">
                             <table class="table table-bordered table-striped">
                                 <thead class="thead-dark">
-                                <th>Vehicle</th>
-                                <th>Trips</th>
-                                <th>Distance (km)</th>
-                                <th>Time</th>
-                                <th>First</th>
-                                <th>Last</th>
+                                    <tr>
+                                        <th>Vehicle</th>
+                                        <th>Trips</th>
+                                        <th>Distance (km)</th>
+                                        <th>Time</th>
+                                        <th>First</th>
+                                        <th>Last</th>
+                                    </tr>
                                 </thead>
                                 <tbody id="output">
 

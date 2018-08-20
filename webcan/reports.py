@@ -109,8 +109,16 @@ def fuel_consumption_all(request):
 
 @view_config(route_name='trip_summary_json', request_method='GET', renderer='bson')
 def trip_summary_json(request):
-    return {
-        'data': request.db.trip_summary.find({'vid': {'$in': _get_user_devices_ids(request)}}, {'_id': 0, 'phases': 0})}
+    heading = "Fuel Economy (L/100km)"
+    rows = {
+        'data': list(request.db.trip_summary.find({
+            'vid': {'$in': _get_user_devices_ids(request)}
+        },
+            {'_id': 0, 'phases': 0}))}
+    for r in rows['data']:
+        if heading not in r:
+            r[heading] = r['Total Fuel (ml)'] / 1000. / r['Distance (km)'] / 100.
+    return rows
 
 
 def trip_dist_fuel(lreadings, trip_key):
@@ -150,11 +158,11 @@ def fuel_consumption_render(request):
         dist_100km = dist / 100.
         fuel_usage_rate_per_100km = fuel_litres / dist_100km
         suffix = "{} {}km {} mL {} L/100km".format(trip_key, dist, fuel_usage, fuel_usage_rate_per_100km)
-        if dist >= min_trip_distance:
-            tables[dev_id].append(fuel_usage_rate_per_100km)
-            labels[dev_id].append(trip_key)
-            # out.append([trip_key, fuel_usage_rate_per_100km])
-            # print("Accepted", suffix)
+        # if dist >= min_trip_distance:
+        tables[dev_id].append(fuel_usage_rate_per_100km)
+        labels[dev_id].append(trip_key)
+        # out.append([trip_key, fuel_usage_rate_per_100km])
+        # print("Accepted", suffix)
         # else:
         #     print("Rejected", suffix)
 
@@ -163,7 +171,11 @@ def fuel_consumption_render(request):
     for device_id in device_ids:
         out = [device_ids]
         ignored = list(x['trip_id'].split('_')[2] for x in request.db.webcan_trip_filters.find({'vid': device_id}))
-        for trip_summary in request.db.trip_summary.find({'vid': device_id, 'trip_key': {'$nin': ignored}},
+        for trip_summary in request.db.trip_summary.find({'vid': device_id,
+                                                          'trip_key': {'$nin': ignored},
+                                                          'Distance (km)': {'$gte': min_trip_distance},
+                                                          'Fuel Economy (L/100km)': {'$gt': 1, '$lt': 100}
+                                                          },
                                                          {'_id': 0, 'phases': 0}):
             # if cached is None:
             #     skipped.append(trip_key)
@@ -193,12 +205,11 @@ def trip_summary_info(request):
 @view_config(route_name='report_summary', request_method='POST', renderer='bson')
 def summary_report_do(request):
     min_trip_distance = float(request.POST.get('min-trip-distance', 5))
-    print(min_trip_distance)
     excluded = []
 
     def gen_summary_report_for_vehicle(vid):
         # get all distinct trip_keys for this vehicle
-        trip_keys = list([x.split('_')[2] for x in request.db.rpi_readings.distinct('trip_id', {'vid': vid})])
+        # trip_keys = list([x.split('_')[2] for x in request.db.rpi_readings.distinct('trip_id', {'vid': vid})])
         # get all the trip_summary data, if not exists, generate
         report = dict(trips=0, distance=0, time=0, first=datetime(9999, 1, 1), last=datetime(2000, 1, 1))
 
@@ -212,36 +223,34 @@ def summary_report_do(request):
 
         filtered_trips = pluck(request.db.webcan_trip_filters.find({'vid': vid}), 'trip_id')
         pool = Pool()
-        for trip_key in trip_keys:
-            trip_summary = request.db.trip_summary.find_one({'trip_key': trip_key},
-                                                            {'_id': 0, 'phases': 0})
-
-            if trip_summary is None:
-                cursor = request.db.rpi_readings.find({
-                    'vid': vid,
-                    'trip_id': {'$nin': filtered_trips}
-                }, {'_id': False}).sort('trip_key', 1)
-                trips = groupby(cursor, lambda x: x['trip_key'])
-                print("Doing summary for", trip_key)
-                for trip_id, readings in trips:
-                    # summarise_trip(trip_id, list(readings), report)
-                    lreadings = list(readings)
-                    report['first'] = min(lreadings[0]['timestamp'], report['first'])
-                    report['last'] = max(lreadings[-1]['timestamp'], report['last'])
-                    pool.apply_async(summarise_trip, args=(trip_id, lreadings), callback=merge, error_callback=print)
-            else:
-                # trip summary contains dict(trips=0, distance=0, time=0)
-                if trip_summary['Distance (km)'] < min_trip_distance:
-                    continue
-                report['first'] = min(trip_summary['Start Time'], report['first'])
-                report['last'] = max(trip_summary['Finish Time'], report['last'])
-                # print("Used cached", trip_key)
-                ts = {
-                    'trips': 1,
-                    'distance': trip_summary['Distance (km)'],
-                    'time': trip_summary['Duration (s)']
-                }
-                merge((ts, trip_key))
+        for trip_summary in request.db.trip_summary.find(
+                {'vid': vid, 'trip_key': {'$nin': filtered_trips},
+                 'Distance (km)': {'$gte': min_trip_distance},
+                 'Fuel Economy (L/100km)': {'$gt': 1, '$lt': 100}},
+                {'phases': 0}):
+            # if trip_summary is None:
+            #     cursor = request.db.rpi_readings.find({
+            #         'vid': vid,
+            #         'trip_id': {'$nin': filtered_trips}
+            #     }, {'_id': False}).sort('trip_key', 1)
+            #     trips = groupby(cursor, lambda x: x['trip_key'])
+            #     print("Doing summary for", trip_key)
+            #     for trip_id, readings in trips:
+            #         # summarise_trip(trip_id, list(readings), report)
+            #         lreadings = list(readings)
+            #         report['first'] = min(lreadings[0]['timestamp'], report['first'])
+            #         report['last'] = max(lreadings[-1]['timestamp'], report['last'])
+            #         pool.apply_async(summarise_trip, args=(trip_id, lreadings), callback=merge, error_callback=print)
+            # else:
+            report['first'] = min(trip_summary['Start Time'], report['first'])
+            report['last'] = max(trip_summary['Finish Time'], report['last'])
+            # print("Used cached", trip_key)
+            ts = {
+                'trips': 1,
+                'distance': trip_summary['Distance (km)'],
+                'time': trip_summary['Duration (s)']
+            }
+            merge((ts, trip_summary['trip_key']))
         pool.close()
         pool.join()
         return report

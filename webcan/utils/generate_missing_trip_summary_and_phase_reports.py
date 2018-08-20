@@ -17,8 +17,16 @@ def phase_and_summary_report(trip_key, vid, uri):
     readings_col = conn.rpi_readings.with_options(
         codec_options=CodecOptions(tz_aware=True, tzinfo=pytz.timezone('Australia/Adelaide')))
     try:
-        readings = list(readings_col.find({'trip_key': trip_key, 'vid': vid}))
-        readings.sort(key=lambda x:x['trip_sequence'])
+        readings = []
+        for _r in readings_col.find({'trip_key': trip_key, 'vid': vid}):
+            # filter out the garbage
+            rpm = _r.get('FMS_ELECTRONIC_ENGINE_CONTROLLER_1 (RPM)')
+            if rpm is not None and rpm > 8000:
+                continue
+            else:
+                readings.append(_r)
+
+        readings.sort(key=lambda x: x['trip_sequence'])
         prev = None
         for p in readings:
             p.update(calc_extra(p, prev))
@@ -69,7 +77,7 @@ def phase_and_summary_report(trip_key, vid, uri):
         'GPS STDEV Speed (km/h)': np.std(speeds),
         'FMS Min Speed (km/h)': np.min(speeds_fms),
         'FMS Max Speed (km/h)': np.max(speeds_fms),
-        'FSM Mean Speed (km/h)': np.mean(speeds_fms),
+        'FMS Mean Speed (km/h)': np.mean(speeds_fms),
         'FMS STDEV Speed (km/h)': np.std(speeds_fms),
         'Total Fuel (ml)': np.sum(fuels),
         'Min Fuel rate (L/h)': np.min(fuel_rates),
@@ -80,8 +88,13 @@ def phase_and_summary_report(trip_key, vid, uri):
         'STDEV CO2 (g)': np.std(co2s),
         'Total CO2e (g)': np.sum(co2s),
         'Total Energy (kWh)': energy.sum(),
-        '% Idle': idle_time / duration * 100
+        '% Idle': idle_time / duration * 100,
+        'Fuel Economy (L/100km)': 0
     })
+    try:
+        summary['Fuel Economy (L/100km)'] = (summary['Total Fuel (ml)']/1000.) / (summary['Distance (km)'] /100.)
+    except:
+        pass
     return summary
 
 

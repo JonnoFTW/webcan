@@ -49,9 +49,12 @@
         var data = google.visualization.arrayToDataTable(dataIn['table']);
         var title = 'Histogram of Fuel Economy (L/100km)\n';
         _.each(dataIn, function(val, key) {
-            if (key !== 'table')
-                title +="{0}: n={1}, std={2} mean={3}\n".format(
-                    key, val['n'], val['std'], val['mean']);
+            if (key === 'table'  || key ==='labels') {
+                return;
+            }
+            title += "{0}: n={1}, std={2} mean={3}\n".format(
+                        key, val['n'], val['std'], val['mean']);
+
         });
         ##  data.addColumn({'type': 'string', 'role': 'tooltip', 'p': {'html': true}});
 
@@ -62,12 +65,14 @@
             histogram: {
                  bucketSize: 1,
                  minValue: 0,
+
                  hideBucketItems: false
                  ##  maxValue: 80
              },
             ##  isStacked: true,
             vAxis: {title: 'Count'},
             hAxis: {
+                type: 'category',
                 title: 'L/100km',
                 ##  ticks: _.range(0, 60)
             }

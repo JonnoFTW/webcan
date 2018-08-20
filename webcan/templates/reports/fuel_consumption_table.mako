@@ -42,7 +42,6 @@
 </table>
 
 <script>
-
     $(document).ready(function () {
         var table = $('#data').DataTable({
             columnDefs: [
@@ -65,14 +64,13 @@
                     render: function(data, type, row, meta) {
                         return data.toFixed(2);
                     },
-                    targets: _.range(4,25)
+                    targets: _.range(4,${len(row.keys())})
                 }
             ],
             ajax: "/report/trips_summary/json",
             columns: ${json.dumps([{'data': x} for x in row.keys()])|n}
         });
         $('select').select2({allowClear: true}).on('select2:select select2:unselect', function (e) {
-
             table.search($(e.target).val()).draw();
         });
 

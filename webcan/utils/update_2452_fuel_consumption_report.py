@@ -42,14 +42,15 @@ def main():
             [co2_per_gj_diesel, ch4_per_gj_diesel, n2o_per_gj_diesel]) * gj_used).sum() * 1000
 
         total_energy = gj_used * gj_to_kwh
-
+        old_trip_summary = conn.trip_summary.find_one({'trip_key': trip_key})
         conn.trip_summary.update_one(
             {'trip_key': trip_key},
             {'$set': {
                 'Total Fuel (ml)': fuel_use_ml,
                 'Mean Fuel Rate (L/h)': total_fuel_used_litres / duration_hours,
                 'Total CO2e (g)': total_co2e,
-                'Total Energy (kWh)': total_energy
+                'Total Energy (kWh)': total_energy,
+                'Fuel Economy (L/100km)': total_fuel_used_litres / (old_trip_summary['Distance (km)'] / 100)
             }}
         )
 
