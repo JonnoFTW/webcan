@@ -10,15 +10,25 @@ from pluck import pluck
 from webcan.reports import _classify_readings_with_phases_pas, per_phase_report
 from webcan.utils import calc_extra
 import numpy as np
+
 np.seterr(all='raise')
 
-def phase_and_summary_report(trip_key, vid, uri):
+
+def phase_and_summary_report(trip_key, vid, uri, exclude):
     conn = MongoClient(uri)['webcan']
     readings_col = conn.rpi_readings.with_options(
         codec_options=CodecOptions(tz_aware=True, tzinfo=pytz.timezone('Australia/Adelaide')))
     try:
         readings = []
-        for _r in readings_col.find({'trip_key': trip_key, 'vid': vid}):
+        for _r in readings_col.find({
+            'trip_key': trip_key,
+            'vid': vid,
+            # 'pos': {
+            #     '$not': {
+            #         '$geoWithin': exclude
+            #     }
+            # }
+        }):
             # filter out the garbage
             rpm = _r.get('FMS_ELECTRONIC_ENGINE_CONTROLLER_1 (RPM)')
             if rpm is not None and rpm > 8000:
@@ -92,7 +102,7 @@ def phase_and_summary_report(trip_key, vid, uri):
         'Fuel Economy (L/100km)': 0
     })
     try:
-        summary['Fuel Economy (L/100km)'] = (summary['Total Fuel (ml)']/1000.) / (summary['Distance (km)'] /100.)
+        summary['Fuel Economy (L/100km)'] = (summary['Total Fuel (ml)'] / 1000.) / (summary['Distance (km)'] / 100.)
     except:
         pass
     return summary
@@ -110,9 +120,16 @@ def main():
     conf.read('../../development.ini')
     uri = conf['app:webcan']['mongo_uri']
 
+
     conn = MongoClient(uri)['webcan']
     done_trips = conn.trip_summary.distinct('trip_key')
     # get all those trip keys from rpi_readings that are not in done_trips and match the vid matches ^adl_metro
+    exclusion_multipolygon = {
+        'type': "MultiPolygon",
+        'coordinates': []
+    }
+    for i in conn.polygons.find({'exclude': True}):
+        exclusion_multipolygon['coordinates'].append([i['poly']['coordinates']])
     trip_keys = conn.rpi_readings.distinct('trip_key',
                                            {'trip_key': {'$nin': done_trips}, 'vid': {'$regex': '^adl_metro'}})
 
@@ -133,7 +150,8 @@ def main():
     for trip_key in trip_keys:
         vid = conn.rpi_readings.find_one({'trip_key': trip_key})['vid']
         # on_complete(phase_and_summary_report(trip_key, vid, uri))
-        pool.apply_async(phase_and_summary_report, args=(trip_key, vid, uri), callback=on_complete, error_callback=print)
+        pool.apply_async(phase_and_summary_report, args=(trip_key, vid, uri, exclusion_multipolygon), callback=on_complete,
+                         error_callback=print)
         i += 1
 
     pool.close()

@@ -223,11 +223,13 @@ def summary_report_do(request):
 
         filtered_trips = pluck(request.db.webcan_trip_filters.find({'vid': vid}), 'trip_id')
         pool = Pool()
-        for trip_summary in request.db.trip_summary.find(
-                {'vid': vid, 'trip_key': {'$nin': filtered_trips},
+        query = {'vid': vid, 'trip_key': {'$nin': filtered_trips},
                  'Distance (km)': {'$gte': min_trip_distance},
-                 'Fuel Economy (L/100km)': {'$gt': 1, '$lt': 100}},
-                {'phases': 0}):
+                 'Fuel Economy (L/100km)': {'$gt': 1, '$lt': 100}}
+        vehicle_obj = request.db.webcan_devices.find_one({'name': vid})
+        if vehicle_obj is not None and vehicle_obj['type'] == 'Electric':
+            del query['Fuel Economy (L/100km)']
+        for trip_summary in request.db.trip_summary.find(query, {'phases': 0}):
             # if trip_summary is None:
             #     cursor = request.db.rpi_readings.find({
             #         'vid': vid,

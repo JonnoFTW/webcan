@@ -19,7 +19,8 @@ def main():
      mean fuel rate
      total co2e
     """
-    trip_keys = list(conn.trip_summary.distinct('trip_key', {'vid': 'adl_metro_2452'}))
+    trip_keys = list(conn.trip_summary.distinct('trip_key',
+                                                {'vid': 'adl_metro_2452', 'Fuel Economy (L/100km)': 0}))
     fuel_name = 'FMS_FUEL_CONSUMPTION (L)'
     for trip_key in tqdm.tqdm(trip_keys, desc='Trip Reports: ', unit=' trips'):
         readings = conn.rpi_readings.find({
