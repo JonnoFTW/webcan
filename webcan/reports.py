@@ -202,6 +202,18 @@ def trip_summary_info(request):
     return request.db.trip_summary.find_one({'trip_key': trip_key}, {'phases': 0, '_id': 0, 'trip_key': 0})
 
 
+@view_config(route_name='show_summary_exclusions', request_method='GET',
+             renderer='templates/reports/summary_exclusions.mako')
+def show_excludes(request):
+    return {}
+
+
+@view_config(route_name='show_summary_exclusions', request_method='POST', renderer='bson')
+def get_exclude_polys(request):
+    polys = list(request.db.polygons.find({},{'_id':0}))
+    return {'polys': polys}
+
+
 @view_config(route_name='report_summary', request_method='POST', renderer='bson')
 def summary_report_do(request):
     min_trip_distance = float(request.POST.get('min-trip-distance', 5))

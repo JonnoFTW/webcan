@@ -58,6 +58,7 @@ def main(global_config, **settings):
     config.add_route('report_fuel_consumption_histogram', '/report/fuel')
     config.add_route('trip_summary_info', '/report/trip_summary_info/{trip_key}')
     config.add_route('report_trip_summary', '/report/trips_summary')
+    config.add_route('show_summary_exclusions', '/report/exclusions')
     config.add_route('trip_summary_csv', '/report/trips_summary/export')
     config.add_route('trip_summary_json', '/report/trips_summary/json')
     config.add_route('report_phase_plot', '/report/phase_plot')
