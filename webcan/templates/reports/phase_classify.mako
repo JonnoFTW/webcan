@@ -121,7 +121,7 @@
                     time = new Date(r.timestamp.$date),
                     speed = r[speed_field];
 
-            var row = new Array(data.ng.length).fill({v: null});
+            var row = new Array(data.getNumberOfColumns()).fill({v: null});
             row[0] = {v: time};
             row[(phase) * 2 + 1] = {v: speed};
             row[(phase) * 2 + 2] = {

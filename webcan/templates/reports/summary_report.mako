@@ -68,12 +68,15 @@
                     function (data) {
                         var $tbl = $('#output');
                         _.forEach(data.summary, function (row, vid) {
+                            function getVid() {
+                                return  vid === 'Aggregate' ? '<b>{0}</b>'.format(vid) : '<a href="/dev/{0}">{0}</a><br/><small>{1}: {2}</small>'.format(vid, row.vehicle.make, row.vehicle.type)
+                            }
                             if (row.trips === 0) {
  var rowh = '<tr><td>{0}</td><td>{1}</td><td>0</td><td>0</td><td></td><td></td></tr>'.format(
-                                        vid === 'Aggregate' ? '<b>{0}</b>'.format(vid) : '<a href="/dev/{0}">{0}</a>'.format(vid), row.trips);
+                                        getVid(), row.trips);
                             } else {
                                 var rowh = '<tr><td>{0}</td><td>{1}</td><td>{2}</td><td>{3}</td><td>{4}</td><td>{5}</td></tr>'.format(
-                                        vid === 'Aggregate' ? '<b>{0}</b>'.format(vid) : '<a href="/dev/{0}">{0}</a>'.format(vid), row.trips, row.distance.toFixed(2), moment.duration(row.time, 'seconds').format(),
+                                        getVid(), row.trips, row.distance.toFixed(2), moment.duration(row.time, 'seconds').format(),
                                         moment(row.first.$date), moment(row.last.$date)
                                 );
                             }

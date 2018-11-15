@@ -224,7 +224,7 @@ def summary_report_do(request):
         # trip_keys = list([x.split('_')[2] for x in request.db.rpi_readings.distinct('trip_id', {'vid': vid})])
         # get all the trip_summary data, if not exists, generate
         report = dict(trips=0, distance=0, time=0, first=datetime(9999, 1, 1), last=datetime(2000, 1, 1))
-
+        report['vehicle'] = request.db.webcan_devices.find_one({'name': vid},{'_id':0, 'secret': 0})
         def merge(trip_info):
             x, trip_id = trip_info
             if x['distance'] >= min_trip_distance:
