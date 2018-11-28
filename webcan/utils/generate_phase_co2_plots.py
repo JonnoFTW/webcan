@@ -39,7 +39,13 @@ def main():
     # vid_re = '^adl_metro_1905'
 
     query = {
-        'vid': {'$in': ['adl_metro_1905','adl_metro_1901', 'adl_metro_2451', 'adl_metro_2450']},
+        'vid': {'$in': [
+            'adl_metro_1902',
+            # 'adl_metro_1905',
+            # 'adl_metro_2450',
+            # 'adl_metro_2451',
+            'adl_metro_2452',
+        ]},
         'Distance (km)': {'$gte': 5}
     }
     if filtered_trips:
@@ -48,6 +54,11 @@ def main():
     charts = [{
             'x': 'Coeff Beta (km/h)/√(Δt)',
             'y': 'Mean Energy (kWh)',
+            'phasetype': 1
+        },
+        {
+            'x': 'Coeff Beta (km/h)/√(Δt)',
+            'y': 'Total CO2 (g) `div` Duration (s)',
             'phasetype': 1
         },
         {
@@ -82,8 +93,12 @@ def main():
             color = next(it)
             try:
                 slope, intercept, r_value, p_value, std_err = stats.linregress(x, y)
-                plt.plot(x, intercept + slope * x,  label="{} ({})\ny={}x+{}".format(vid, len(y), slope, intercept),
-                         color='k', path_effects=[pe.Stroke(linewidth=5, foreground=color), pe.Normal()])
+                # stats.poly
+                plt.plot(x, intercept + slope * x,
+                         label="{} ({})\ny={}x+{}".format(vid, len(y), np.round_(slope,3), np.round_(intercept,3)),
+                         color='k',
+                         path_effects=[pe.Stroke(linewidth=5, foreground=color), pe.Normal()]
+                         )
             except ValueError as e:
                 print("Skipping trend for ",vid)
         plt.legend()
