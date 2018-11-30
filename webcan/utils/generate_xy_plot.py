@@ -1,17 +1,27 @@
 from itertools import cycle
 import configparser
 import numpy as np
-from scipy import stats
 from matplotlib import cm
 from pymongo import MongoClient
 import tabulate
 import matplotlib.pyplot as plt
 import matplotlib.patheffects as pe
+from scipy.ndimage.filters import gaussian_filter
+
+plt.rcParams["figure.figsize"] = (14, 10)
 
 
 def trend_lbl(name, length, slope, intercept, r_value):
-    return "{} ({})\ny={}x+{}\nr={}".format(name, length, np.round_(slope, 3), np.round_(intercept, 3),
-                                            np.round(r_value, 3))
+    return "{} ({})\n$y={}x+{}$\n$r^2$={}".format(name, length, np.round_(slope, 3), np.round_(intercept, 3),
+                                                np.round(r_value, 3))
+
+
+def myplot(x, y, s, bins=1000):
+    heatmap, xedges, yedges = np.histogram2d(x, y, bins=bins)
+    heatmap = gaussian_filter(heatmap, sigma=s)
+
+    extent = [xedges[0], xedges[-1], yedges[0], yedges[-1]]
+    return heatmap.T, extent
 
 
 def plot(f, x_title, y_title, plt_title, trend_title, xlim, ylim):
@@ -53,27 +63,38 @@ def plot(f, x_title, y_title, plt_title, trend_title, xlim, ylim):
         plt.figure()
         x = np.array(x)
         y = np.array(y)
-        trend = stats.linregress(x, y)
-        slope, intercept, r_value, p_value, std_err = trend
-        plt.scatter(x, y, s=4)
         bus_short = bus.split('_')[-1]
-        plt.plot(x, intercept + slope * x,
-                 label=trend_lbl(bus_short, len(x), slope, intercept, r_value),
-                 color='k',
-                 path_effects=[pe.Stroke(linewidth=5, foreground='r'), pe.Normal()]
-                 )
-        plt.ylim(*ylim)
-        plt.xlim(*xlim)
-        plt.xlabel(x_title)
-        plt.ylabel(y_title)
-        plt.legend()
-        plt.title(plt_title + bus_short)
-        plt.savefig('./out/' + plt_title + bus_short + '.png')
-        table.append({
-            'bus': bus_short,
-            'Trend': trend,
-            'x': x
-        })
+        # plt.scatter(x, y, s=4)
+        #
+        # trend = stats.linregress(x, y)
+        # slope, intercept, r_value, p_value, std_err = trend
+        # plt.plot(x, intercept + slope * x,
+        #          label=trend_lbl(bus_short, len(x), slope, intercept, r_value),
+        #          color='k',
+        #          path_effects=[pe.Stroke(linewidth=5, foreground='r'), pe.Normal()]
+        #          )
+        #
+        # plt.ylim(*ylim)
+        # plt.xlim(*xlim)
+        # plt.xlabel(x_title)
+        # plt.ylabel(y_title)
+        # plt.legend()
+        # plt.title(plt_title + bus_short)
+        # plt.savefig('./out/' + plt_title + bus_short + '.png')
+        # plt.figure()
+        # plt.ylim(*ylim)
+        # plt.xlim(*xlim)
+        s = 64
+        img, extent = myplot(x, y, s)
+        plt.imshow(img, extent=extent, origin='lower', cmap=cm.jet)
+        plt.title("Heatmap of {} {} $\sigma$ = {}".format(plt_title, bus_short, s))
+        plt.savefig('./out/' + plt_title + bus_short + '_heatmap.png')
+        # table.append({
+        #     'bus': bus_short,
+        #     'Trend': trend,
+        #     'x': x
+        # })
+    return
     colors = cm.rainbow(np.linspace(0, 1, len(table)))
     it = cycle(colors)
     plt.figure()
