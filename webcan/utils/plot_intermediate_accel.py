@@ -1,4 +1,4 @@
-from generate_xy_plot import plot
+from .generate_xy_plot import plot
 
 duration = 'Duration (s)'
 co2 = 'Total CO2 (g)'
@@ -28,13 +28,13 @@ def f3(p):
 def f4(p):
     d = diff(p)
     if p['phasetype'] == 4 and p[duration] > 4 and p[co2] > 0 and d > 0:
-        return (p['Finish Speed (km/h)'] - p['Start Speed (km/h)']) / p[duration], p[co2] / p[duration]
+        return d / p[duration], p[co2] / p[duration]
 
 
 def f5(p):
     d = diff(p)
     if p['phasetype'] == 5 and p[duration] > 4 and p[co2] > 0 and d < 0:
-        return (p['Finish Speed (km/h)'] - p['Start Speed (km/h)']) / p[duration], p[co2] / p[duration]
+        return d / p[duration], p[co2] / p[duration]
 
 
 if __name__ == "__main__":
@@ -42,28 +42,38 @@ if __name__ == "__main__":
          beta_coeff,
          'CO2 per Second',
          'Acceleration from Zero Profile for ',
-         'Comparison of Acceleration from Zero Model Trendlines'
+         'Comparison of Acceleration from Zero Model Trendlines',
+         (0, 30),
+         (0, 55)
          )
     plot(f3,
          'Deceleration Rate (km/h/s)',
          'CO2 Per Second (g/s)',
          'Deceleration to Zero Profile for ',
-         'Comparison of Deceleration to Idle Model Trendlines'
+         'Comparison of Deceleration to Idle Model Trendlines',
+         (-10, 0),
+         (0, 55),
          )
     plot(f4,
          'Acceleration Rate (km/h/s)',
          'CO2 Per Second (g/s)',
          'Intermediate Acceleration Profile for ',
-         'Comparison of Intermediate Acceleration Model Trendlines'
+         'Comparison of Intermediate Acceleration Model Trendlines',
+         (0, 10),
+         (0, 55),
          )
     plot(f5,
          'Deceleration Rate (km/h/s)',
          'CO2 Per Second (g/s)',
-         'Deceleration to Zero Profile for ',
-         'Comparison of Intermediate Deceleration Model Trendlines'
+         'Intermediate Deceleration Profile for ',
+         'Comparison of Intermediate Deceleration Model Trendlines',
+         (-10, 0),
+         (0, 55),
          )
     plot(f2,
          'Mean Cruise Speed',
          'CO2 Per Second (g/s)',
          'Cruise Emissions for ',
-         'Comparison of Cruise Emissions Model Trendlines')
+         'Comparison of Cruise Emissions Model Trendlines',
+         (0, 110),
+         (0, 55))

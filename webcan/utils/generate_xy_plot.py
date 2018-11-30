@@ -14,7 +14,7 @@ def trend_lbl(name, length, slope, intercept, r_value):
                                             np.round(r_value, 3))
 
 
-def plot(f, x_title, y_title, plt_title, trend_title):
+def plot(f, x_title, y_title, plt_title, trend_title, xlim, ylim):
     """
 
     :param f: function to run on each phase, returns an x and y tuple
@@ -62,8 +62,8 @@ def plot(f, x_title, y_title, plt_title, trend_title):
                  color='k',
                  path_effects=[pe.Stroke(linewidth=5, foreground='r'), pe.Normal()]
                  )
-        # plt.ylim(0, 50)
-        # plt.xlim(0, 30)
+        plt.ylim(*ylim)
+        plt.xlim(*xlim)
         plt.xlabel(x_title)
         plt.ylabel(y_title)
         plt.legend()
@@ -88,8 +88,8 @@ def plot(f, x_title, y_title, plt_title, trend_title):
     plt.legend()
     plt.title(trend_title)
     plt.xlabel(x_title)
-    # plt.ylim(0, 50)
-    # plt.xlim(0, 30)
+    plt.ylim(*ylim)
+    plt.xlim(*xlim)
 
     plt.ylabel(y_title)
     plt.savefig('./out/' + trend_title + '.png')
