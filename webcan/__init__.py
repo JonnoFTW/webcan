@@ -111,6 +111,6 @@ def main(global_config, **settings):
     config.add_renderer('shp', 'webcan.renderers.ShapefileRenderer')
     config.add_renderer('sqlite', 'webcan.renderers.SpatialiteRenderer')
 
-    config.scan()
+    config.scan(ignore='webcan.utils')
     app = config.make_wsgi_app()
     return app

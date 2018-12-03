@@ -1,4 +1,4 @@
-from .generate_xy_plot import plot
+from webcan.utils.generate_xy_plot import plot
 
 duration = 'Duration (s)'
 co2 = 'Total CO2 (g)'
