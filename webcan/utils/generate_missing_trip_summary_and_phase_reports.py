@@ -1,15 +1,16 @@
-import pytz
 import configparser
-from multiprocessing import Pool
+from datetime import datetime
+
+import numpy as np
+import pytz
 import tqdm
 from bson import CodecOptions
 from geopy.distance import distance
-from pymongo import MongoClient, ASCENDING
 from pluck import pluck
+from pymongo import MongoClient
 
 from webcan.reports import _classify_readings_with_phases_pas, per_phase_report
 from webcan.utils import calc_extra
-import numpy as np
 
 np.seterr(all='raise')
 
@@ -67,7 +68,7 @@ def phase_and_summary_report(trip_key, vid, uri, exclude):
     gps_spd = 'spd_over_grnd'
     duration = (p[-1]['timestamp'] - p[0]['timestamp']).total_seconds()
     if duration < 5:
-        print("{} too short with duration={}".format(trip_key,duration))
+        print("{} too short with duration={}".format(trip_key, duration))
         return
     speeds_fms = np.array(pluck(p, fms_spd, default=0))
     speeds = np.array(pluck(p, gps_spd, default=0))
@@ -127,12 +128,17 @@ def parse(val):
     }.get(type(val), lambda x: x)(val)
 
 
-def main():
-    conf = configparser.ConfigParser()
-    conf.read('../../development.ini')
-    uri = conf['app:webcan']['mongo_uri']
+def main(request=None):
+    if request is None:
+        conf = configparser.ConfigParser()
+        conf.read('../../development.ini')
+        uri = conf['app:webcan']['mongo_uri']
 
-    conn = MongoClient(uri)['webcan']
+        conn = MongoClient(uri)['webcan']
+    else:
+        conn = request.db_conn
+    if conn.report_running.find_one():
+        return "Already Running A Report"
     done_trips = conn.trip_summary.distinct('trip_key')
     # get all those trip keys from rpi_readings that are not in done_trips and match the vid matches ^adl_metro
     exclusion_multipolygon = {
@@ -143,19 +149,25 @@ def main():
         exclusion_multipolygon['coordinates'].append([i['poly']['coordinates']])
     trip_keys = conn.rpi_readings.distinct('trip_key',
                                            {'trip_key': {'$nin': done_trips}, 'vid': {'$regex': '^adl_metro'}})
+    conn.report_running.insert_one({'running': True, 'progress': 0.0, 'done': 0, 'total': len(trip_keys), 'started': datetime.now()})
 
     prog = tqdm.tqdm(trip_keys, desc='Trip Reports: ', unit=' trips')
 
+    # n = 0
     def on_complete(r):
         # put this in the db
         # print(r)
         if not r:
             return
         try:
+
             conn.trip_summary.insert_one({k: parse(v) for k, v in r.items()})
         except Exception as e:
             print("Failed to upload trip {}: {}".format(r['trip_key'], e))
         prog.update()
+        # n+=1
+        conn.report_running.update_one(
+            {'running': True, '$set': {'done': prog.n, 'progress': 100 * float(prog.n) / len(trip_keys)}})
 
     # pool = Pool(2)
     i = 0
@@ -166,7 +178,7 @@ def main():
         # pool.apply_async(phase_and_summary_report, args=(trip_key, vid, uri, exclusion_multipolygon), callback=on_complete,
         #                  error_callback=print)
         i += 1
-
+    conn.report_running.delete_one({})
     # pool.close()
     # pool.join()
     # prog.close()
