@@ -1,22 +1,22 @@
 import json
-from datetime import datetime
-import pytz
-from pyramid.renderers import render_to_response, get_renderer
-from bson.codec_options import CodecOptions
-
-from webcan.errors import AJAXHttpBadRequest
-from .utils import calc_extra
-from .views import get_device_trips_for_user, _get_user_devices_ids
-from pyramid.view import view_config
-from geopy.distance import vincenty
 from collections import defaultdict
-from pluck import pluck
+from datetime import datetime
+from itertools import groupby, zip_longest
+from multiprocessing import Pool
+
 import numpy as np
 import pymongo
-from webob import exc
-from itertools import groupby, zip_longest
+import pytz
+from bson.codec_options import CodecOptions
+from geopy.distance import vincenty
+from pluck import pluck
+from pyramid.renderers import render_to_response, get_renderer
+from pyramid.view import view_config
 from scipy import stats
-from multiprocessing import Pool
+from webob import exc
+
+from .utils import calc_extra
+from .views import get_device_trips_for_user, _get_user_devices_ids
 
 # import asyncio
 # import websockets
@@ -45,12 +45,22 @@ def phase_classify(request):
         'GET_TRIP': request.GET.get('trip_id', '')
     }
 
-@view_config(route_name='generate_report', request_method='GET', renderer='templates/reports/generate_reports.mako')
+
+@view_config(route_name='generate_report', request_method='GET', renderer='templates/reports/generate_phase_reports.mako')
 def generate_reports(request):
     # check if the report generator is already running
     return {
-
+        'running': request.db.report_running.find_one()
     }
+
+
+@view_config(route_name='generate_report', request_method='POST', renderer='json')
+def generate_reports_post(request):
+    # check if the report generator is already running
+    return {
+        'running': request.db.report_running.find_one()
+    }
+
 
 @view_config(route_name='report_summary', request_method='GET', renderer='templates/reports/summary_report.mako')
 def summary_report(request):
@@ -201,12 +211,13 @@ def fuel_consumption_render(request):
     data['labels'] = labels
     data['_aggregate'] = []
     for i in device_ids:
-        trips = list(request.db.trip_summary.find({'vid': i, 'Distance (km)': {'$gte': min_trip_distance}}, {'phases': 0}))
+        trips = list(
+            request.db.trip_summary.find({'vid': i, 'Distance (km)': {'$gte': min_trip_distance}}, {'phases': 0}))
         total_fuel = sum(x['Total Fuel (ml)'] / 1000. for x in trips)
         total_dist = sum(x['Distance (km)'] / 100. for x in trips)
         data['_aggregate'].append({
             'Bus': i,
-            'Fuel Economy (l/100km)': round(total_fuel / total_dist,2)
+            'Fuel Economy (l/100km)': round(total_fuel / total_dist, 2)
         })
 
     return data
@@ -226,7 +237,7 @@ def show_excludes(request):
 
 @view_config(route_name='show_summary_exclusions', request_method='POST', renderer='bson')
 def get_exclude_polys(request):
-    polys = list(request.db.polygons.find({},{'_id':0}))
+    polys = list(request.db.polygons.find({}, {'_id': 0}))
     return {'polys': polys}
 
 
@@ -240,7 +251,8 @@ def summary_report_do(request):
         # trip_keys = list([x.split('_')[2] for x in request.db.rpi_readings.distinct('trip_id', {'vid': vid})])
         # get all the trip_summary data, if not exists, generate
         report = dict(trips=0, distance=0, time=0, first=datetime(9999, 1, 1), last=datetime(2000, 1, 1))
-        report['vehicle'] = request.db.webcan_devices.find_one({'name': vid},{'_id':0, 'secret': 0})
+        report['vehicle'] = request.db.webcan_devices.find_one({'name': vid}, {'_id': 0, 'secret': 0})
+
         def merge(trip_info):
             x, trip_id = trip_info
             if x['distance'] >= min_trip_distance:
@@ -466,7 +478,8 @@ def per_phase_report(readings, min_duration=5):
             'Duration (s)': duration,
             'Avg Temp (°C)': np.mean(pluck(p, 'FMS_ENGINE_TEMP (°C)', default=0)),
             'Distance (km)': sum(
-                vincenty(r1['pos']['coordinates'][::-1], r2['pos']['coordinates'][::-1]).kilometers for r2, r1 in zip(p, p[1:])),
+                vincenty(r1['pos']['coordinates'][::-1], r2['pos']['coordinates'][::-1]).kilometers for r2, r1 in
+                zip(p, p[1:])),
             'Start Speed (km/h)': speeds[0],
             'Finish Speed (km/h)': speeds[-1],
             'Min Speed (km/h)': np.min(speeds),

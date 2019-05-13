@@ -62,6 +62,7 @@ def main(global_config, **settings):
     config.add_route('trip_summary_csv', '/report/trips_summary/export')
     config.add_route('trip_summary_json', '/report/trips_summary/json')
     config.add_route('report_phase_plot', '/report/phase_plot')
+    config.add_route('generate_report', '/report/generate')
 
     config.add_route('api_upload', '/api/upload')
     config.add_route('api_shuttle', '/api/shuttle')
