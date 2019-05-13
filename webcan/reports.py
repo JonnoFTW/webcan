@@ -45,6 +45,12 @@ def phase_classify(request):
         'GET_TRIP': request.GET.get('trip_id', '')
     }
 
+@view_config(route_name='generate_report', request_method='GET', renderer='templates/reports/generate_reports.mako')
+def generate_reports(request):
+    # check if the report generator is already running
+    return {
+
+    }
 
 @view_config(route_name='report_summary', request_method='GET', renderer='templates/reports/summary_report.mako')
 def summary_report(request):
@@ -59,7 +65,7 @@ def summarise_trip(trip_id, readings):
 
     readings.sort(key=lambda x: x['trip_sequence'])
     trip_report['distance'] += sum(
-        vincenty(r1['pos']['coordinates'], r2['pos']['coordinates']).kilometers for r2, r1 in
+        vincenty(r1['pos']['coordinates'][::-1], r2['pos']['coordinates'][::-1]).kilometers for r2, r1 in
         zip(readings, readings[1:]))
     trip_report['trips'] += 1
     trip_report['time'] += (readings[-1]['timestamp'] - readings[0]['timestamp']).total_seconds()
@@ -193,6 +199,16 @@ def fuel_consumption_render(request):
     out.extend(zip_longest(*(tables[x] for x in device_ids)))
     data['table'] = out
     data['labels'] = labels
+    data['_aggregate'] = []
+    for i in device_ids:
+        trips = list(request.db.trip_summary.find({'vid': i, 'Distance (km)': {'$gte': min_trip_distance}}, {'phases': 0}))
+        total_fuel = sum(x['Total Fuel (ml)'] / 1000. for x in trips)
+        total_dist = sum(x['Distance (km)'] / 100. for x in trips)
+        data['_aggregate'].append({
+            'Bus': i,
+            'Fuel Economy (l/100km)': round(total_fuel / total_dist,2)
+        })
+
     return data
 
 
@@ -450,7 +466,7 @@ def per_phase_report(readings, min_duration=5):
             'Duration (s)': duration,
             'Avg Temp (°C)': np.mean(pluck(p, 'FMS_ENGINE_TEMP (°C)', default=0)),
             'Distance (km)': sum(
-                vincenty(r1['pos']['coordinates'], r2['pos']['coordinates']).kilometers for r2, r1 in zip(p, p[1:])),
+                vincenty(r1['pos']['coordinates'][::-1], r2['pos']['coordinates'][::-1]).kilometers for r2, r1 in zip(p, p[1:])),
             'Start Speed (km/h)': speeds[0],
             'Finish Speed (km/h)': speeds[-1],
             'Min Speed (km/h)': np.min(speeds),
@@ -538,7 +554,7 @@ def _summarise_readings(readings):
                     duration += (r1['timestamp'] - start).total_seconds()
                     start = r2['timestamp']
                     continue
-                dist += vincenty(r1['pos']['coordinates'], r2['pos']['coordinates']).kilometers
+                dist += vincenty(r1['pos']['coordinates'][::-1], r2['pos']['coordinates'][::-1]).kilometers
 
             for phase, data in groupby(val, key=lambda x: f"{x['phase']}:{x['trip_key']}"):
                 phase = phase.split(':')[0]

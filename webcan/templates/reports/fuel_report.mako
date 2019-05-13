@@ -28,6 +28,20 @@
                                 <i id="load-icon" class="fa fa-refresh fa-spin fa-fw" style="display:none"></i>
                             </div>
                         </div>
+                        <div class="col-12">
+                            <table class="table" id="aggr-table">
+                                <thead>
+                                <th>Vehicle</th>
+                                <th>Total Fuel Economy (l/100km)</th>
+                                <th>Trip Wise Fuel Economy (l/100km)</th>
+                                <th>Trip Count</th>
+                                <th>Std</th>
+                                </thead>
+                                <tbody>
+
+                                </tbody>
+                            </table>
+                        </div>
                         <div class="col-12" id="chart_div" style="height: 900px">
 
                             ## Histogram of litres per 100km
@@ -48,12 +62,12 @@
     function drawChart(dataIn) {
         var data = google.visualization.arrayToDataTable(dataIn['table']);
         var title = 'Histogram of Fuel Economy (L/100km)\n';
-        _.each(dataIn, function(val, key) {
-            if (key === 'table'  || key ==='labels') {
+        _.each(dataIn, function (val, key) {
+            if (key === 'table' || key === 'labels' || key.startsWith('_')) {
                 return;
             }
             title += "{0}: n={1}, std={2} mean={3}\n".format(
-                        key, val['n'], val['std'], val['mean']);
+                    key, val['n'], val['std'], val['mean']);
 
         });
         ##  data.addColumn({'type': 'string', 'role': 'tooltip', 'p': {'html': true}});
@@ -63,11 +77,11 @@
             interpolateNulls: false,
             ##  legend: {position: 'none'},
             histogram: {
-                 bucketSize: 1,
-                 minValue: 0,
+                bucketSize: 1,
+                minValue: 0,
 
-                 hideBucketItems: false
-                 ##  maxValue: 80
+                hideBucketItems: false
+                ##  maxValue: 80
              },
             ##  isStacked: true,
             vAxis: {title: 'Count'},
@@ -79,26 +93,26 @@
         };
 
         var chart = new google.visualization.Histogram(document.getElementById('chart_div'));
-        google.visualization.events.addListener(chart, 'select', function() {
-             var selection = chart.getSelection();
-             ##  console.log(selection);
+        google.visualization.events.addListener(chart, 'select', function () {
+            var selection = chart.getSelection();
+            ##  console.log(selection);
              for (var i = 0; i < selection.length; i++) {
-                 console.log(data.getValue(selection[i].row, selection[i].column));
-                 var col_lbl = data.getColumnLabel(selection[i].column)
-                 var trip_key = dataIn['labels'][col_lbl][selection[i].row];
+                console.log(data.getValue(selection[i].row, selection[i].column));
+                var col_lbl = data.getColumnLabel(selection[i].column)
+                var trip_key = dataIn['labels'][col_lbl][selection[i].row];
                 console.log(col_lbl, trip_key);
-                $.getJSON('/report/trip_summary_info/{}'.format(trip_key), function(d) {
+                $.getJSON('/report/trip_summary_info/{}'.format(trip_key), function (d) {
                     var html = '<b>Vehicle:</b> <a href="/dev/{0}">{0}</a><br><b>Trip Key:</b> <a href="/dev/{0}?key={1}">{1}</a><br>'.format(col_lbl, trip_key);
-                    _.each(d, function(val, key) {
-                        if(_.isObject(val)) {
-                            val = moment.unix(val.$date/1000).format();
+                    _.each(d, function (val, key) {
+                        if (_.isObject(val)) {
+                            val = moment.unix(val.$date / 1000).format();
                         }
-                       html += "<b>{0}:</b> {1}<br>".format(key, val);
+                        html += "<b>{0}:</b> {1}<br>".format(key, val);
                     });
                     $('#selected-info').html(html);
                 });
 
-             }
+            }
         });
         ##  google.visualization.events.addListener(chart, 'onmouseover', function(rc) {
         ##      console.log(data.getValue(rc.row, rc.column-1));
@@ -117,12 +131,21 @@
             $out.text('');
             var vehicle_id = $('#select-vid').val();
             $.post('/report/fuel',
-                    {'device': vehicle_id,
-                    'min_trip_distance': $('#min-trip-distance').val()},
+                    {
+                        'device': vehicle_id,
+                        'min_trip_distance': $('#min-trip-distance').val()
+                    },
                     function (data) {
                         drawChart(data, vehicle_id);
-                    }, 'json').
-            fail(function (x, text, err) {
+                        var aggrtable = $('#aggr-table');
+                        $('#aggr-table tbody').empty();
+
+                        _.each(data['_aggregate'], function (val) {
+                            const vid = val['Bus'];
+                            aggrtable.append('<tr><td>{}</td><td>{}</td><td>{}</td><td>{}</td><td>{}</td><td>{}</td></tr>'.format(vid, val['Fuel Economy (l/100km)'], data[vid].mean, data[vid].n, data[vid].std))
+                        });
+
+                    }, 'json').fail(function (x, text, err) {
                 console.log(x, text, err);
                 $('#load-button').append(
                         '<div class="alert alert-danger" role="alert">\n' +
