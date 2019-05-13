@@ -3,7 +3,7 @@ import configparser
 from multiprocessing import Pool
 import tqdm
 from bson import CodecOptions
-from geopy.distance import vincenty
+from geopy.distance import distance
 from pymongo import MongoClient, ASCENDING
 from pluck import pluck
 
@@ -13,9 +13,13 @@ import numpy as np
 
 np.seterr(all='raise')
 
+ignore = {'7pcuBZ'}
+
 
 def phase_and_summary_report(trip_key, vid, uri, exclude):
     conn = MongoClient(uri)['webcan']
+    if trip_key in ignore:
+        return
     readings_col = conn.rpi_readings.with_options(
         codec_options=CodecOptions(tz_aware=True, tzinfo=pytz.timezone('Australia/Adelaide')))
     try:
@@ -44,11 +48,15 @@ def phase_and_summary_report(trip_key, vid, uri, exclude):
 
         _classify_readings_with_phases_pas(readings, 3, 1)
         phase_report = per_phase_report(readings)
+
     except Exception as e:
         raise Exception(f"Error reporting {vid}:{trip_key} {e}")
     for pr in phase_report:
         for k, v in pr.items():
             pr[k] = parse(v)
+    if not readings:
+        print("{} is empty".format(trip_key))
+        return None
     summary = {
         'trip_key': trip_key,
         'vid': readings[0]['vid'],
@@ -58,6 +66,9 @@ def phase_and_summary_report(trip_key, vid, uri, exclude):
     fms_spd = 'FMS_CRUISE_CONTROL_VEHICLE_SPEED (km/h)'
     gps_spd = 'spd_over_grnd'
     duration = (p[-1]['timestamp'] - p[0]['timestamp']).total_seconds()
+    if duration < 5:
+        print("{} too short with duration={}".format(trip_key,duration))
+        return
     speeds_fms = np.array(pluck(p, fms_spd, default=0))
     speeds = np.array(pluck(p, gps_spd, default=0))
     fuel_rates = np.array(pluck(p, 'FMS_FUEL_ECONOMY (L/h)', default=0))
@@ -80,7 +91,8 @@ def phase_and_summary_report(trip_key, vid, uri, exclude):
         'Duration (s)': duration,
         'Idle Duration (s)': idle_time,
         'Distance (km)': sum(
-            vincenty(r1['pos']['coordinates'], r2['pos']['coordinates']).kilometers for r2, r1 in zip(p, p[1:])),
+            distance(r1['pos']['coordinates'][::-1], r2['pos']['coordinates'][::-1]).kilometers for r2, r1 in
+            zip(p, p[1:])),
         'GPS Min Speed (km/h)': np.min(speeds),
         'GPS Max Speed (km/h)': np.max(speeds),
         'GPS Mean Speed (km/h)': np.mean(speeds),
@@ -120,7 +132,6 @@ def main():
     conf.read('../../development.ini')
     uri = conf['app:webcan']['mongo_uri']
 
-
     conn = MongoClient(uri)['webcan']
     done_trips = conn.trip_summary.distinct('trip_key')
     # get all those trip keys from rpi_readings that are not in done_trips and match the vid matches ^adl_metro
@@ -138,25 +149,27 @@ def main():
     def on_complete(r):
         # put this in the db
         # print(r)
+        if not r:
+            return
         try:
             conn.trip_summary.insert_one({k: parse(v) for k, v in r.items()})
-        except Exception  as e:
+        except Exception as e:
             print("Failed to upload trip {}: {}".format(r['trip_key'], e))
         prog.update()
 
-    pool = Pool(2)
+    # pool = Pool(2)
     i = 0
 
     for trip_key in trip_keys:
         vid = conn.rpi_readings.find_one({'trip_key': trip_key})['vid']
-        # on_complete(phase_and_summary_report(trip_key, vid, uri))
-        pool.apply_async(phase_and_summary_report, args=(trip_key, vid, uri, exclusion_multipolygon), callback=on_complete,
-                         error_callback=print)
+        on_complete(phase_and_summary_report(trip_key, vid, uri, exclusion_multipolygon))
+        # pool.apply_async(phase_and_summary_report, args=(trip_key, vid, uri, exclusion_multipolygon), callback=on_complete,
+        #                  error_callback=print)
         i += 1
 
-    pool.close()
-    pool.join()
-    prog.close()
+    # pool.close()
+    # pool.join()
+    # prog.close()
 
 
 if __name__ == "__main__":
