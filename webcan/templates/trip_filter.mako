@@ -63,7 +63,6 @@
                                     this.setTooltip("Deleted filter", $trigger);
                                 }
                         )
-
                     },
                     set_filter: function (trigger) {
                         $trigger = $(trigger.currentTarget);

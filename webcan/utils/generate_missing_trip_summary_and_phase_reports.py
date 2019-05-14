@@ -1,4 +1,5 @@
 import configparser
+import traceback
 from datetime import datetime
 
 import numpy as np
@@ -9,7 +10,6 @@ from geopy.distance import distance
 from pluck import pluck
 from pymongo import MongoClient
 
-from webcan.reports import _classify_readings_with_phases_pas, per_phase_report
 from webcan.utils import calc_extra
 
 np.seterr(all='raise')
@@ -17,7 +17,7 @@ np.seterr(all='raise')
 ignore = {'7pcuBZ'}
 
 
-def phase_and_summary_report(trip_key, vid, uri, exclude):
+def phase_and_summary_report(trip_key, vid, uri, exclude, _classify_readings_with_phases_pas, per_phase_report):
     conn = MongoClient(uri)['webcan']
     if trip_key in ignore:
         return
@@ -28,11 +28,13 @@ def phase_and_summary_report(trip_key, vid, uri, exclude):
         for _r in readings_col.find({
             'trip_key': trip_key,
             'vid': vid,
-            # 'pos': {
-            #     '$not': {
-            #         '$geoWithin': exclude
-            #     }
-            # }
+            'pos': {
+                '$not': {
+                    '$geoWithin': {
+                        '$geometry': exclude
+                    }
+                }
+            }
         }):
             # filter out the garbage
             rpm = _r.get('FMS_ELECTRONIC_ENGINE_CONTROLLER_1 (RPM)')
@@ -128,61 +130,70 @@ def parse(val):
     }.get(type(val), lambda x: x)(val)
 
 
-def main(request=None):
+def main(_classify_readings_with_phases_pas, per_phase_report, request=None):
     if request is None:
         conf = configparser.ConfigParser()
         conf.read('../../development.ini')
         uri = conf['app:webcan']['mongo_uri']
-
-        conn = MongoClient(uri)['webcan']
     else:
-        conn = request.db_conn
-    if conn.report_running.find_one():
-        return "Already Running A Report"
-    done_trips = conn.trip_summary.distinct('trip_key')
-    # get all those trip keys from rpi_readings that are not in done_trips and match the vid matches ^adl_metro
-    exclusion_multipolygon = {
-        'type': "MultiPolygon",
-        'coordinates': []
-    }
-    for i in conn.polygons.find({'exclude': True}):
-        exclusion_multipolygon['coordinates'].append([i['poly']['coordinates']])
-    trip_keys = conn.rpi_readings.distinct('trip_key',
-                                           {'trip_key': {'$nin': done_trips}, 'vid': {'$regex': '^adl_metro'}})
-    conn.report_running.insert_one({'running': True, 'progress': 0.0, 'done': 0, 'total': len(trip_keys), 'started': datetime.now()})
+        uri = request.registry.settings['mongo_uri']
+    conn = MongoClient(uri)['webcan']
+    try:
+        if conn.report_running.find_one():
+            return "Already Running A Report"
+        done_trips = conn.trip_summary.distinct('trip_key')
+        # get all those trip keys from rpi_readings that are not in done_trips and match the vid matches ^adl_metro
+        exclusion_multipolygon = {
+            'type': "MultiPolygon",
+            'coordinates': []
+        }
+        for i in conn.polygons.find({'exclude': True}):
+            exclusion_multipolygon['coordinates'].append([i['poly']['coordinates']])
+        trip_keys = conn.rpi_readings.distinct('trip_key',
+                                               {'trip_key': {'$nin': done_trips}, 'vid': {'$regex': '^adl_metro'}})
+        conn.report_running.insert_one(
+            {'running': True, 'progress': 0.0, 'done': 0, 'total': len(trip_keys), 'started': datetime.now()})
 
-    prog = tqdm.tqdm(trip_keys, desc='Trip Reports: ', unit=' trips')
+        prog = tqdm.tqdm(trip_keys, desc='Trip Reports: ', unit=' trips')
 
-    # n = 0
-    def on_complete(r):
-        # put this in the db
-        # print(r)
-        if not r:
-            return
-        try:
+        def on_complete(r):
+            # put this in the db
+            try:
+                if r:
+                    conn.trip_summary.insert_one({k: parse(v) for k, v in r.items()})
+            except Exception as e:
+                print("Failed to upload trip {}: {}".format(r['trip_key'], e))
+            finally:
+                prog.update()
+                conn.report_running.update_one({'running': True},{'$set': {'done': prog.n, 'progress': 100 * float(prog.n) / len(trip_keys)}})
+        # pool = Pool(2)
+        i = 0
 
-            conn.trip_summary.insert_one({k: parse(v) for k, v in r.items()})
-        except Exception as e:
-            print("Failed to upload trip {}: {}".format(r['trip_key'], e))
-        prog.update()
-        # n+=1
-        conn.report_running.update_one(
-            {'running': True, '$set': {'done': prog.n, 'progress': 100 * float(prog.n) / len(trip_keys)}})
-
-    # pool = Pool(2)
-    i = 0
-
-    for trip_key in trip_keys:
-        vid = conn.rpi_readings.find_one({'trip_key': trip_key})['vid']
-        on_complete(phase_and_summary_report(trip_key, vid, uri, exclusion_multipolygon))
-        # pool.apply_async(phase_and_summary_report, args=(trip_key, vid, uri, exclusion_multipolygon), callback=on_complete,
-        #                  error_callback=print)
+        for trip_key in trip_keys:
+            vid = conn.rpi_readings.find_one({'trip_key': trip_key})['vid']
+            on_complete(
+                phase_and_summary_report(trip_key, vid, uri, exclusion_multipolygon, _classify_readings_with_phases_pas,
+                                         per_phase_report))
+            # pool.apply_async(phase_and_summary_report, args=(trip_key, vid, uri, exclusion_multipolygon), callback=on_complete,
+            #                  error_callback=print)
         i += 1
-    conn.report_running.delete_one({})
+        print("done")
+        conn.report_error.delete_many({})
+    except Exception as e:
+        print(e)
+
+        conn.report_error.insert_one({
+            'err': traceback.format_exc(),
+            'dt': datetime.now()
+        })
+    finally:
+        conn.report_running.delete_one({})
     # pool.close()
     # pool.join()
     # prog.close()
 
 
 if __name__ == "__main__":
-    main()
+    from webcan.reports import _classify_readings_with_phases_pas, per_phase_report
+
+    main(_classify_readings_with_phases_pas, per_phase_report, request=None)

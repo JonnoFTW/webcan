@@ -2,8 +2,11 @@ import json
 from collections import defaultdict
 from datetime import datetime
 from itertools import groupby, zip_longest
-from multiprocessing import Pool
+from multiprocessing import Pool, Process
 
+from pyramid.httpexceptions import HTTPFound
+
+from webcan.utils.generate_missing_trip_summary_and_phase_reports import main as _generate_reports
 import numpy as np
 import pymongo
 import pytz
@@ -18,8 +21,6 @@ from webob import exc
 from .utils import calc_extra
 from .views import get_device_trips_for_user, _get_user_devices_ids
 
-# import asyncio
-# import websockets
 
 phase = 'phase'
 trip_sequence = 'trip_sequence'
@@ -50,16 +51,26 @@ def phase_classify(request):
 def generate_reports(request):
     # check if the report generator is already running
     return {
-        'running': request.db.report_running.find_one()
+        'running': request.db.report_running.find_one(),
+        'error': request.db.report_error.find_one(sort=[('_id', -1)])
     }
 
 
 @view_config(route_name='generate_report', request_method='POST', renderer='json')
 def generate_reports_post(request):
-    # check if the report generator is already running
-    return {
-        'running': request.db.report_running.find_one()
-    }
+    """
+    Run the report in a subprocess,
+    :param request:
+    :return:
+    """
+    running = request.db.report_running.find_one()
+    if running:
+        return {"running": "Already Running"}
+    else:
+        proc = Process(target=_generate_reports, args=(_classify_readings_with_phases_pas, per_phase_report, request,))
+        proc.start()
+
+    return HTTPFound(location=request.route_url('generate_report'))
 
 
 @view_config(route_name='report_summary', request_method='GET', renderer='templates/reports/summary_report.mako')
