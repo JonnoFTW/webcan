@@ -14,10 +14,11 @@ def main():
     conn = MongoClient(uri)['webcan']
 
     buses = [
-        'adl_metro_1902',
-        'adl_metro_1905',
-        'adl_metro_2450',
-        'adl_metro_2451',
+        # 'adl_metro_1902',
+        # 'adl_metro_1905',
+        # 'adl_metro_2450',
+        # 'adl_metro_2451',
+        'adl_metro_2452',
     ]
     duration = 'Duration (s)'
     co2 = 'Total CO2 (g)'
@@ -42,6 +43,7 @@ def main():
         plt.ylabel('Frequency')
         plt_title = 'Histogram of Idle Phase Durations for ' + bus
         plt.title(plt_title)
+
         plt.savefig('./out/' + plt_title + '.png')
         table.append({
             'bus': bus,

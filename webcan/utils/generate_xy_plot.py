@@ -44,11 +44,11 @@ def plot(f, x_title, y_title, plt_title, trend_title, xlim, ylim):
 
     buses = [
         # 'adl_metro_1902',
-        'adl_metro_1999',
+        # 'adl_metro_1999',
         # 'adl_metro_1905',
         # 'adl_metro_2450',
         # 'adl_metro_2451',
-        # 'adl_metro_2452',
+        'adl_metro_2452',
     ]
     table = []
     print(plt_title)
@@ -82,7 +82,7 @@ def plot(f, x_title, y_title, plt_title, trend_title, xlim, ylim):
         plt.ylabel(y_title)
         plt.legend()
         plt.title(plt_title + bus_short)
-        # plt.savefig('./out/' + plt_title + bus_short + '.png')
+        plt.savefig('./out/' + plt_title + bus_short + '.png')
         print('\t' + bus_short)
         plt.figure()
         s = 64
@@ -91,7 +91,7 @@ def plot(f, x_title, y_title, plt_title, trend_title, xlim, ylim):
         plt.title("Heatmap of {} {} $\sigma$ = {}".format(plt_title, bus_short, s))
         plt.xlabel(x_title)
         plt.ylabel(y_title)
-        # plt.savefig('./out/' + plt_title + bus_short + '_heatmap.png')
+        plt.savefig('./out/' + plt_title + bus_short + '_heatmap.png')
         # table.append({
         #     'bus': bus_short,
         #     'Trend': trend,

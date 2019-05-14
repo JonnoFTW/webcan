@@ -33,10 +33,10 @@ def main():
 
     conn = MongoClient(uri)['webcan']
     buses = [
-        'adl_metro_1902',
-        'adl_metro_1905',
-        'adl_metro_2450',
-        'adl_metro_2451',
+        # 'adl_metro_1902',
+        # 'adl_metro_1905',
+        # 'adl_metro_2450',
+        # 'adl_metro_2451',
         'adl_metro_2452',
     ]
     pd.options.display.float_format = '{:.2f}'.format
@@ -84,7 +84,7 @@ def main():
                 suffix = "km/h/s"
 
             tbl.append({
-                'Vehicle': bus,
+                'Vehicle': bus.split('_')[0],
                 'Phase Number': i,
                 'Phase Type': phase_types[i].title(),
                 'Total Duration': durations.sum(),

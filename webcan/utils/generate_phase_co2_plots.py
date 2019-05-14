@@ -40,7 +40,7 @@ def main():
 
     query = {
         'vid': {'$in': [
-            'adl_metro_1902',
+            # 'adl_metro_1902',
             # 'adl_metro_1905',
             # 'adl_metro_2450',
             # 'adl_metro_2451',
