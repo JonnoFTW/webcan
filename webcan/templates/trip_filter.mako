@@ -30,8 +30,10 @@
 <%
     import json
 %>
-<script src="https://unpkg.com/vue"></script>
-<script src="https://unpkg.com/vue-resource@1.3.4/dist/vue-resource.min.js"></script>
+<!--<script src="https://unpkg.com/vue"></script>
+<script src="https://unpkg.com/vue-resource@1.3.4/dist/vue-resource.min.js"></script>-->
+<script src="https://cdn.jsdelivr.net/npm/vue@2.6.14/dist/vue.js"></script>
+
 <script type="text/javascript">
     Vue.component('trip-reason-component',
             {
